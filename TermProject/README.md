@@ -16,9 +16,9 @@ Please contact any of the members below:
  - Jaclyn Coate: jcoate@smu.edu 
  - Josh Eysenbach: jeysenbach@smu.edu
 
- [Final Presentations]: 
- [CodeBook]: 
+ [Final Presentations]: <>
+ [CodeBook]: <>
  [WorkingCode]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/WorkingCode>
  [Requirements]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Requirements>
  [Data]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Data>
- [Miscellaneous]: 
+ [Miscellaneous]: <>
