@@ -4,21 +4,21 @@
 The purpose of this repository is to share our collaborative work in order to complete our MSDS 6373 Time Series term project. We researched and selected data sets in order to do an evaluation on the COVID pandemic on both the US and California. We created predictive models using teqchniques such as univariate and mulitvairate analysis.
 
 ## Github Case Study Structure
-* [Final Presentations] - Final Presenations
+* [Final Presentations] - final presenations
 * [CodeBook] - final knitable codebook for the project
 * [WorkingCode] - contains individual code books for different required sections of the project
 * [Requirements] - term project documentation and rubric
 * [Data] - chosen data sources
-* [Miscellaneous] - miscellaneous files and drafts left over from our learning curve with Git and RStudio
+* [Miscellaneous] - miscellaneous files and drafts left over from our learning curve with the project
 
 ## Contributors
 Please contact any of the members below: 
  - Jaclyn Coate: jcoate@smu.edu 
  - Josh Eysenbach: jeysenbach@smu.edu
 
- [Final Presentations]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/presentations/finalpresentations>
- [CodeBook]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/codebook>
+ [Final Presentations]: 
+ [CodeBook]: 
  [WorkingCode]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/WorkingCode>
- [Requirements]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/case_study_req>
+ [Requirements]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Requirements>
  [Data]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Data>
- [Miscellaneous]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/Misc>         
+ [Miscellaneous]: 
