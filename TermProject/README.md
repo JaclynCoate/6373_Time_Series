@@ -5,7 +5,7 @@ The purpose of this repository is to share our collaborative work in order to co
 
 ## Github Case Study Structure
 * [Final Presentations] - Final Presenations
-* [CodeBook] - contains a codebook for the project
+* [CodeBook] - final knitable codebook for the project
 * [WorkingCode] - contains individual code books for different required sections of the project
 * [Requirements] - term project documentation and rubric
 * [Data] - chosen data sources
