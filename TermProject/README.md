@@ -18,7 +18,7 @@ Please contact any of the members below:
 
  [Final Presentations]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/presentations/finalpresentations>
  [CodeBook]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/codebook>
- [WorkingCode]: 
+ [WorkingCode]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/WorkingCode>
  [Requirements]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/case_study_req>
- [Data]:
+ [Data]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Data>
  [Miscellaneous]: <https://github.com/JaclynCoate/6306_Case_Study_1/tree/master/Misc>         
