@@ -8,7 +8,6 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(skimr)
-
 ```
 
 # US COVID Data
@@ -130,7 +129,7 @@ In order to review the data in
 When reviewing the daily positivty rate, the metric discussed that is more reported on lately. We see the positivity rate actually decreasing over time. We would expect this outcome since we saw a drastic increase in testing over time as well.
 
 ```{r}
-us$posRate <- us$positiveIncrease / us$totalTestResults
+us$posRate <- us$positive / us$totalTestResults
 
 ggplot(data = us, aes(x=date, y=posRate))+
   geom_line(color="gold")+
