@@ -1,0 +1,167 @@
+---
+title: "Project: California COVID-19 Data EDA"
+author: "jeysenbach"
+date: "7/20/2020"
+output: html_document
+---
+
+
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tswge)
+library(ggthemes)
+```
+
+
+```{r, message=FALSE}
+#Import Data obtained from ca.gov
+CA <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/CA_COVID_7.16.20.csv", header = T)
+#Re-format Date
+CA$date <- as.Date(CA$date, format = "%m/%d/%Y")
+head(CA)
+```
+### California: Available Variables
+1. *Date* - Official reporting began 3/18/20. Hospitalization reporting began 3/29/20.
+2. *newtested* - New tests each day
+3. *testedtotal* - Cumulative total tests
+4. *newcountconfirmed* - New positive tests each day
+5. *totalcountconfirmed* - Cumulative total positive tests
+6. *newpospercent* - Positive Percent: New daily positive tests divided by new daily tests
+7. *pospercent_14dayavg* - Rolling average of last 2 weeks of positive percent
+8. *newcountdeaths* - New deaths each day of confirmed cases
+9. *totalcountdeaths* - Cumulative total deaths
+10. *hospitalized_covid_confirmed_patients* - Currently hospitalized patients with positive tests
+11. *hospitalized_suspected_covid_patients* - Currently hospitalized patients with symptoms but not tested
+12. *hospitalized_covid_patients* - Hospitalized patients with confirmed + suspected cases
+13. *all_hospital_beds* - Total available hospital beds
+14. *icu_covid_confirmed_patients* - Patients with positive tests in intensive care
+15. *icu_suspected_covid_patients* - Patients with symptoms but not tested in intensive care
+16. *icu_available_beds* - Total available intensive care unit beds
+
+
+### California: Plots of daily COVID-related measures
+
+```{r}
+#Daily New Confirmed Cases
+ggplot(data=CA, aes(x=date, y=newcountconfirmed, group=1)) + 
+  geom_line(color="gold") + ggtitle("New Confirmed COVID-19 Cases in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
+
+#New Tests
+ggplot(data=CA, aes(x=date, y=newtested, group=1)) + 
+  geom_line(color="green2") + ggtitle("New COVID-19 Tests in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
+```
+There are 2 large spikes in test numbers; these were due to a lag in data from San Francisco on tests administered.
+```{r}
+#Hospitalizated Patients
+ggplot(data=CA, aes(x=date, y=hospitalized_covid_confirmed_patients, group=1)) + 
+  geom_line(color="orange") + ggtitle("Hospitalized Patients Confirmed with COVID-19 in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
+
+#Daily Deaths
+ggplot(data=CA, aes(x=date, y=newcountdeaths, group=1)) + 
+  geom_line(color="darkred") + ggtitle("Daily COVID-19 Related Deaths in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
+
+```
+
+```{r}
+#Positive Test Rate - Daily vs Avg last 2 weeks
+ggplot(data=CA) + 
+  geom_line(data=CA,aes(x=date, y=pospercent_14dayavg), color="blue") + 
+  geom_line(data=CA,aes(x=date, y=newpospercent), color="green3") +
+  ggtitle("CA: Daily Positivity Rate (Green) and 14 Day Avg Pos Rate (Blue)") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Percent")+ theme_hc()
+```
+The rolling average of the past 14 days is the measure of positive percent being reported by the California state government each day. Overlaying this over the daily positive test rate, there doesn't appear to be any issue with using the 2 week avg.
+
+
+### California: Plots of Cumulative Totals
+
+```{r}
+#Cumulative total Cases
+ggplot(data=CA, aes(x=date, y=totalcountconfirmed, group=1)) + 
+  geom_line(color="gold") + ggtitle("Cumulative Total COVID-19 Confirmed Cases in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
+
+#Cumulative total Tests
+ggplot(data=CA, aes(x=date, y=testedtotal, group=1)) + 
+  geom_line(color="green2") + ggtitle("Cumulative Total COVID-19 Tests in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
+
+#Cumulative total Deaths
+ggplot(data=CA, aes(x=date, y=totalcountdeaths, group=1)) + 
+  geom_line(color="darkred") + ggtitle("Cumulative Total COVID-19 Related Deaths in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
+```
+
+The "hospitalized_covid_patients" category was not completely populated for the time frame that both confirmed and suspected hospitalizations data was available, so a new variable is created that calculates total hospitalized covid patients (confirmed + suspected).
+
+```{r}
+Totalhosp <- (CA$hospitalized_covid_confirmed_patients + CA$hospitalized_suspected_covid_patients)
+
+colors <- c("Confirmed COVID Patients" = "red", "Confirmed + Suspected COVID Patients" = "orange")
+ggplot(data=CA) + 
+  geom_line(data=CA,aes(x=date, y=hospitalized_covid_confirmed_patients, color="Confirmed COVID Patients")) + 
+  geom_line(data=CA,aes(x=date, y=Totalhosp, color="Confirmed + Suspected COVID Patients")) +
+  ggtitle("Hospitalized COVID-19 Patients") + 
+  scale_x_date(date_labels = "%b") + labs(x="", y="Patients", color = "") +scale_color_manual(values = colors) +
+  theme_hc()
+```
+
+Because the availability of tests has increased over time, using the total hospitalized patients (confirmed + suspected) might be the best representation even though there is a possibility that some suspected cases may not actually be COVID-related. 
+
+
+### California: Spectral Density Plots
+
+The variables we are interested in forecasting are Hospitalized Patients and New Confirmed Cases, so we check those for any cyclic behavior that could be informative for model building.
+```{r}
+parzen.wge(CA$newcountconfirmed)
+
+parzen.wge(Totalhosp)
+```
+We might expect some cyclic behavior for confirmed tests as test reporting would be less common on weekends. There is a small peak that would represent a period of about 4 that could represent this. It might be valuable in short-term forecasting. Hospitalizations has less clear indications of any periodicity. 
+
+### California: Stationary Model Estimation for COVID-related Hospitalizations
+
+```{r}
+#Estimate p and q
+aic5.wge(Totalhosp)
+# aic5.wge(Totalhosp, type = "bic") this also resulted in recommending AR2
+
+#Estimate phi and theta
+Hosp_est <- est.ar.wge(Totalhosp, p=2, type = "burg")
+#one week forecast of AR2 model
+fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 7, lastn = FALSE, limits = FALSE)
+#3 month Forecast of AR2 model
+fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 90, lastn = FALSE, limits = FALSE)
+```
+What this means to us: A stationary model like this one is useful only if it is believed that the count is going to immediately begin its decline toward the mean of the data we have. Whether that is likely or not is anyone's guess, but based on the apparent trend in the short term, we might not consider that to be realistic for a 7 day forecast. What we do know is that the count does have to come down at some point, and for a 90 day forecast this model could be a guess that takes into account our knowledge of this assumption of eventual decrease. It could be reasonable to assume that the number of hospitalizations will make its way down to the average number seen in the previous few months before eventually falling further later.
+
+### California: Non-Stationary Model Estimation for COVID-related Hospitalizations
+
+A non-stationary model based on differencing can represent what we are currently seeing with an increasing trend. This would be for only short-term forecasting with the assumption that spike has not reached its zenith. It would only be useful for short term forecasting because we assume that this increasing trend cannot go on indefinitely. We need to build the model using only the data representing the spike that started in late June to capture the recent trend.
+```{r}
+Totalhosp2 <- Totalhosp[90:119] #This is only the hospitalized patients data from late June to present
+
+#Differencing the data: We want a second difference so that the current trend will continue
+Totalhosp2_d1 <- artrans.wge(Totalhosp2, phi.tr = 1)
+Totalhosp2_d2 <- artrans.wge(Totalhosp2_d1, phi.tr = 1) 
+
+#The resulting realization and ACF plot suggest that this is not white noise - we should fit an ARMA model to the differenced data.
+#Estimate p and q
+aic5.wge(Totalhosp2_d2) #AR4
+#Estimate phi and theta
+Hosp_est2 <- est.ar.wge(Totalhosp2_d2,p=4, type = "burg")
+#one week forecast of ARIMA(4,2,0) model
+fore.aruma.wge(Totalhosp, phi = Hosp_est2$phi, d=2, n.ahead = 7, lastn = FALSE, limits = FALSE)
+```
+
+We can take a closer look at what the 7 day forecast looks like for just the trend we've seen in the past month. This seems like a reasonable expectation for the next week, but we would not use this to predict much further than that.
+```{r}
+fore.aruma.wge(Totalhosp2, phi = Hosp_est2$phi, d=2, n.ahead = 7, lastn = FALSE, limits = FALSE)
+```
+
+
