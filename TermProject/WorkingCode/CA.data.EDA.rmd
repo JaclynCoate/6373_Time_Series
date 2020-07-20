@@ -21,7 +21,9 @@ CA <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/m
 CA$date <- as.Date(CA$date, format = "%m/%d/%Y")
 head(CA)
 ```
+
 ### California: Available Variables
+
 1. *Date* - Official reporting began 3/18/20. Hospitalization reporting began 3/29/20.
 2. *newtested* - New tests each day
 3. *testedtotal* - Cumulative total tests
@@ -53,6 +55,7 @@ ggplot(data=CA, aes(x=date, y=newtested, group=1)) +
   geom_line(color="green2") + ggtitle("New COVID-19 Tests in CA") + 
   scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
 ```
+
 There are 2 large spikes in test numbers; these were due to a lag in data from San Francisco on tests administered.
 ```{r}
 #Hospitalizated Patients
@@ -75,6 +78,7 @@ ggplot(data=CA) +
   ggtitle("CA: Daily Positivity Rate (Green) and 14 Day Avg Pos Rate (Blue)") + 
   scale_x_date(date_labels = "%b") + xlab("") + ylab("Percent")+ theme_hc()
 ```
+
 The rolling average of the past 14 days is the measure of positive percent being reported by the California state government each day. Overlaying this over the daily positive test rate, there doesn't appear to be any issue with using the 2 week avg.
 
 
