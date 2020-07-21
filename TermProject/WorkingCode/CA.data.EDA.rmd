@@ -56,7 +56,7 @@ ggplot(data=CA, aes(x=date, y=newtested, group=1)) +
   scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
 ```
 
-There are 2 large spikes in test numbers; these were due to a lag in data from San Francisco on tests administered.
+There are 2 large spikes in test numbers; these were due to a backlog in data from San Francisco on tests administered.
 ```{r}
 #Hospitalizated Patients
 ggplot(data=CA, aes(x=date, y=hospitalized_covid_confirmed_patients, group=1)) + 
@@ -79,7 +79,7 @@ ggplot(data=CA) +
   scale_x_date(date_labels = "%b") + xlab("") + ylab("Percent")+ theme_hc()
 ```
 
-The rolling average of the past 14 days is the measure of positive percent being reported by the California state government each day. Overlaying this over the daily positive test rate, there doesn't appear to be any issue with using the 2 week avg.
+The rolling average of the past 14 days is the measure of positive percent being reported by the California state government each day. Overlaying this over the daily positive test rate, this does appear to be a good way to smooth the data in a sensible way, spreading out the effects of potential lag between tests and results as well as the changes in availability of testing at different times in the week.
 
 
 ### California: Plots of Cumulative Totals
@@ -101,7 +101,10 @@ ggplot(data=CA, aes(x=date, y=totalcountdeaths, group=1)) +
   scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_hc()
 ```
 
-The "hospitalized_covid_patients" category was not completely populated for the time frame that both confirmed and suspected hospitalizations data was available, so a new variable is created that calculates total hospitalized covid patients (confirmed + suspected).
+
+### California: Hospitalized Patients
+
+As stated in the analysis of the US data, the number of hospitalized patients is a valuable metric for determining the impact of the virus over time as it represents the primary driving factor for policy making. is a The "hospitalized_covid_patients" category was not completely populated for the time frame that both confirmed and suspected hospitalizations data was available, so a new variable is created that calculates total hospitalized covid patients (confirmed + suspected).
 
 ```{r}
 Totalhosp <- (CA$hospitalized_covid_confirmed_patients + CA$hospitalized_suspected_covid_patients)
@@ -118,18 +121,45 @@ ggplot(data=CA) +
 Because the availability of tests has increased over time, using the total hospitalized patients (confirmed + suspected) might be the best representation even though there is a possibility that some suspected cases may not actually be COVID-related. 
 
 
+How does Hospitalization compare to new cases? New cases might be valuable in predicting hospitalization, or the realtionship between them could be informative in terms of the impact of the virus. Based on the plot below, there is an interesting pattern of cases making its way above the hospitalized patients curve, but it is reasonable to assume that currently hospitalizations rise as the number of daily new cases rises. 
+
+```{r}
+colors <- c("Confirmed COVID Hospital Patients" = "red", "New positive cases" = "orange")
+ggplot(data=CA) + 
+  geom_line(data=CA,aes(x=date, y=hospitalized_covid_confirmed_patients, color="Confirmed COVID Hospital Patients")) + 
+  geom_line(data=CA,aes(x=date, y=newcountconfirmed, color="New positive cases")) +
+  ggtitle("Hospitalized COVID-19 Patients vs New Cases in CA") + 
+  scale_x_date(date_labels = "%b") + labs(x="", y="Patients", color = "") +scale_color_manual(values = colors) +
+  theme_hc()
+```
+
+
+
 ### California: Spectral Density Plots
 
-The variables we are interested in forecasting are Hospitalized Patients and New Confirmed Cases, so we check those for any cyclic behavior that could be informative for model building.
+The variable we are most interested in forecasting is Hospitalized Patients, so we check for any cyclic behavior that could be informative for model building.
 ```{r}
-parzen.wge(CA$newcountconfirmed)
-
 parzen.wge(Totalhosp)
 ```
-We might expect some cyclic behavior for confirmed tests as test reporting would be less common on weekends. There is a small peak that would represent a period of about 4 that could represent this. It might be valuable in short-term forecasting. Hospitalizations has less clear indications of any periodicity. 
+
+There are no non-zero peaks on the spectral density plot that are particularly revealing, but we may be interested later in only modeling the most recent upward trend (late June to present), so we can also check for any underlying cycles in that portion of the series by itself.
+
+```{r}
+Totalhosp2 <- Totalhosp[90:119] #This is only the hospitalized patients data from late June to present
+parzen.wge(Totalhosp2)
+```
+
+There does not appear to be any cyclic behavior hiding in this time frame either.
+
+
 
 ### California: Stationary Model Estimation for COVID-related Hospitalizations
 
+It is difficult to consider this data stationary in its own right due to the apparent dependence of hospitalized patients on time and non-constant variance (both attributable to the recent upward trend). We also know that the number started at zero (although it wasn't tracked from that point in this dataset) and will, under the assumption that this is a novel virus, eventually end at zero. However, the use of a stationary model for prediction could be useful based on this knowledge of eventual decline, as its use would force a forecast back to the mean of the data we have.
+
+#### Stationary models using the entire dataset
+
+A model based on the top recommendation by AIC.
 ```{r}
 #Estimate p and q
 aic5.wge(Totalhosp)
@@ -142,17 +172,32 @@ fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 7, lastn = FALSE, limits 
 #3 month Forecast of AR2 model
 fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
-What this means to us: A stationary model like this one is useful only if it is believed that the count is going to immediately begin its decline toward the mean of the data we have. Whether that is likely or not is anyone's guess, but based on the apparent trend in the short term, we might not consider that to be realistic for a 7 day forecast. What we do know is that the count does have to come down at some point, and for a 90 day forecast this model could be a guess that takes into account our knowledge of this assumption of eventual decrease. It could be reasonable to assume that the number of hospitalizations will make its way down to the average number seen in the previous few months before eventually falling further later.
+
+Another stationary model - ARMA(1,2) based on second suggestion from aic.wge.
+```{r}
+#Estimate phi and theta for an ARMA(1,2)
+Hosp_estq <- est.arma.wge(Totalhosp, p=1,q=2)
+#one week forecast of AR2 model
+fore.arma.wge(Totalhosp, phi = Hosp_estq$phi, theta = Hosp_estq$theta, n.ahead = 7, lastn = FALSE, limits = FALSE)
+#3 month Forecast of AR2 model
+fore.arma.wge(Totalhosp, phi = Hosp_estq$phi, theta = Hosp_estq$theta, n.ahead = 90, lastn = FALSE, limits = FALSE)
+```
+
+What this means to us: Stationary models like these are useful only if it is believed that the count is going to (almost) immediately begin its decline toward the mean of the data we have (the ARMA(1,2) model has a slight increase first). Whether an imminent decline is likely or not is anyone's guess, but based on the apparent trend in the short term, we might not consider that to be realistic for a 7 day forecast. What we do know is that the count does have to come down at some point, and for a 90 day forecast this model could be a guess that takes into account our knowledge of this assumption of eventual decrease. It could be reasonable to assume that the number of hospitalizations will make its way down to the average number seen in the previous few months before eventually falling further later.
+
+
+
 
 ### California: Non-Stationary Model Estimation for COVID-related Hospitalizations
 
-A non-stationary model based on differencing can represent what we are currently seeing with an increasing trend. This would be for only short-term forecasting with the assumption that spike has not reached its zenith. It would only be useful for short term forecasting because we assume that this increasing trend cannot go on indefinitely. We need to build the model using only the data representing the spike that started in late June to capture the recent trend.
+We established that there is little no cyclic behavior to model, but a non-stationary model based on differencing can represent what we are currently seeing with an increasing trend. This would be only for short-term forecasting with the assumption that spike has not reached its zenith. A rationale for this assumption would be that we believe it is currently unlikely for hospitalizations to decline or remain constant as long as the number of new cases is increasing based on the plot of the two we looked at earlier. It would only be useful for short term forecasting because we assume that this increasing trend cannot go on indefinitely. We need to build the model using only the data representing the spike that started in late June to capture the recent trend.
+
 ```{r}
 Totalhosp2 <- Totalhosp[90:119] #This is only the hospitalized patients data from late June to present
 
 #Differencing the data: We want a second difference so that the current trend will continue
 Totalhosp2_d1 <- artrans.wge(Totalhosp2, phi.tr = 1)
-Totalhosp2_d2 <- artrans.wge(Totalhosp2_d1, phi.tr = 1) 
+Totalhosp2_d2 <- artrans.wge(Totalhosp2_d1, phi.tr = 1)
 
 #The resulting realization and ACF plot suggest that this is not white noise - we should fit an ARMA model to the differenced data.
 #Estimate p and q
