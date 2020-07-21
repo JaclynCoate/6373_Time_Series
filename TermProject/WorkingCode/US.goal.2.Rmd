@@ -112,23 +112,23 @@ mean(us$hospitalizedCurrently)
 #### ARMA(5,1)
 ARMA(5,1) Short Term
 ```{r}
-fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 7, lastn = FALSE, limits = FALSE)
+shortARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
 
 ARMA(5,1) Long Term
 ```{r}
-fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = FALSE, limits = FALSE)
+longARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
 
 #### AR(2)
 
 AR(2) Short Term
 ```{r}
-fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d = 1, s = 7, n.ahead = 7, lastn = FALSE, limits = FALSE)
+shortAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d = 1, s = 7, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
 
 AR(2) Long Term
 ```{r}
-fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d = 1, s = 7, n.ahead = 90, lastn = FALSE, limits = FALSE)
+longAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d = 1, s = 7, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
 
