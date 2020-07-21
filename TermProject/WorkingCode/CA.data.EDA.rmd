@@ -168,19 +168,19 @@ aic5.wge(Totalhosp)
 #Estimate phi and theta
 Hosp_est <- est.ar.wge(Totalhosp, p=2, type = "burg")
 #one week forecast of AR2 model
-fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 7, lastn = FALSE, limits = FALSE)
+f1 <- fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 7, lastn = FALSE, limits = FALSE)
 #3 month Forecast of AR2 model
-fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 90, lastn = FALSE, limits = FALSE)
+f1 <- fore.arma.wge(Totalhosp, phi = Hosp_est$phi, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
 
 Another stationary model - ARMA(1,2) based on second suggestion from aic.wge.
 ```{r}
 #Estimate phi and theta for an ARMA(1,2)
-Hosp_estq <- est.arma.wge(Totalhosp, p=1,q=2)
+Hosp_estq <- est.arma.wge(Totalhosp, p=1,q=2) #AR component has a root very close to 1
 #one week forecast of AR2 model
-fore.arma.wge(Totalhosp, phi = Hosp_estq$phi, theta = Hosp_estq$theta, n.ahead = 7, lastn = FALSE, limits = FALSE)
+fq <- fore.arma.wge(Totalhosp, phi = Hosp_estq$phi, theta = Hosp_estq$theta, n.ahead = 7, lastn = FALSE, limits = FALSE)
 #3 month Forecast of AR2 model
-fore.arma.wge(Totalhosp, phi = Hosp_estq$phi, theta = Hosp_estq$theta, n.ahead = 90, lastn = FALSE, limits = FALSE)
+fq <- fore.arma.wge(Totalhosp, phi = Hosp_estq$phi, theta = Hosp_estq$theta, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
 
 What this means to us: Stationary models like these are useful only if it is believed that the count is going to (almost) immediately begin its decline toward the mean of the data we have (the ARMA(1,2) model has a slight increase first). Whether an imminent decline is likely or not is anyone's guess, but based on the apparent trend in the short term, we might not consider that to be realistic for a 7 day forecast. What we do know is that the count does have to come down at some point, and for a 90 day forecast this model could be a guess that takes into account our knowledge of this assumption of eventual decrease. It could be reasonable to assume that the number of hospitalizations will make its way down to the average number seen in the previous few months before eventually falling further later.
@@ -196,21 +196,23 @@ We established that there is little no cyclic behavior to model, but a non-stati
 Totalhosp2 <- Totalhosp[90:119] #This is only the hospitalized patients data from late June to present
 
 #Differencing the data: We want a second difference so that the current trend will continue
-Totalhosp2_d1 <- artrans.wge(Totalhosp2, phi.tr = 1)
-Totalhosp2_d2 <- artrans.wge(Totalhosp2_d1, phi.tr = 1)
+Totalhosp2_d1 <- artrans.wge(Totalhosp2, phi.tr = 1) #acf makes it look like there might be a cycle
+acf(Totalhosp2_d1) # the "cycle" is not significant
+Totalhosp2_d2 <- artrans.wge(Totalhosp2_d1, phi.tr = 1) #acf plot looks like it might not be white noise
+acf(Totalhosp2_d2, lag.max = 30) #based on conf limits ...it is white noise
+ljung.wge(Totalhosp2_d2, K=12)$pval #Fewer data points to work with - lower K.
+ljung.wge(Totalhosp2_d2, K=25)$pval #both FTR.
 
-#The resulting realization and ACF plot suggest that this is not white noise - we should fit an ARMA model to the differenced data.
-#Estimate p and q
-aic5.wge(Totalhosp2_d2) #AR4
-#Estimate phi and theta
-Hosp_est2 <- est.ar.wge(Totalhosp2_d2,p=4, type = "burg")
-#one week forecast of ARIMA(4,2,0) model
-fore.aruma.wge(Totalhosp, phi = Hosp_est2$phi, d=2, n.ahead = 7, lastn = FALSE, limits = FALSE)
+#The resulting realization, ACF plot, and ljung- Box test suggest that the diff data is white noise; no need to fit the differenced data.
+
+#The final model is a simple ARIMA(0,0,0) with d=2
+f2 <- fore.aruma.wge(Totalhosp, d=2, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
 
 We can take a closer look at what the 7 day forecast looks like for just the trend we've seen in the past month. This seems like a reasonable expectation for the next week, but we would not use this to predict much further than that.
 ```{r}
-fore.aruma.wge(Totalhosp2, phi = Hosp_est2$phi, d=2, n.ahead = 7, lastn = FALSE, limits = FALSE)
+f2c <- fore.aruma.wge(Totalhosp2, d=2, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
+
 
 
