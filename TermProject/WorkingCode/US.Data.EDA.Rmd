@@ -221,3 +221,12 @@ ggplot(data = us, aes(x=date, y=deathRate))+
   labs(title = "Daily Death Rate COVID Testing US", y = "Rate", x = "") +
   theme_hc()
 ```
+
+## Matrix Scatterplot of Surfaced Variables
+Trying to create pairs plots for all the variables against eachother would be very difficult to interpret. As suspected there are highly correlated variables since we are graphing things like total postive tests and new positive tests. These variables would be inherently correlated to one another because they are communicating similar data. Since this is the case we will only review a scatterplot of those variables we have surfaced above and will use for forecasting the multivariate testing.
+
+```{r}
+library(GGally)
+scatter <- subset(us, select = c(positive, negative, hospitalizedCurrently, hospitalizedCumulative, death, totalTestResults, deathIncrease, hospitalizedIncrease, negativeIncrease, positiveIncrease, posRate, deathRate))
+ggpairs(scatter)
+```
