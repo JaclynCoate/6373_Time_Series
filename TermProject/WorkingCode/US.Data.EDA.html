@@ -581,11 +581,11 @@ tail(us)</code></pre>
 ##  n obs: 179 
 ##  n variables: 17 
 ## 
-## ── Variable type:Date ────────────────────────────────────────────────────────────────────────────────────────────────────
+## ── Variable type:Date ─────────────────────────────────────────────────────────────────────
 ##  variable missing complete   n        min        max     median n_unique
 ##      date       0      179 179 2020-01-22 2020-07-18 2020-04-20      179
 ## 
-## ── Variable type:integer ─────────────────────────────────────────────────────────────────────────────────────────────────
+## ── Variable type:integer ──────────────────────────────────────────────────────────────────
 ##              variable missing complete   n          mean            sd
 ##         deathIncrease       0      179 179     739.64        736.87   
 ##  hospitalizedIncrease       0      179 179    1544.35       1972.24   
@@ -603,7 +603,7 @@ tail(us)</code></pre>
 ##      0  203.5   21590   28924.5       77233       ▇▂▇▂▁▁▁▁
 ##      2 3739   4056142       1.9e+07       4.5e+07 ▇▂▁▁▁▁▁▁
 ## 
-## ── Variable type:numeric ─────────────────────────────────────────────────────────────────────────────────────────────────
+## ── Variable type:numeric ──────────────────────────────────────────────────────────────────
 ##                variable missing complete   n      mean        sd p0   p25
 ##                   death       0      179 179  50519.59  49837.79  0  26.5
 ##  hospitalizedCumulative       0      179 179 107636.91  1e+05     0   6  
@@ -677,7 +677,7 @@ ggplot(data = us, aes(x=date, y=positive))+
 <p>When measuring the severity of cases, we wanted to make sure that we are including the most severe cases; we believe that a good indicator of this would be a hospitalization metric. This is not only because the severe cases would end up hospitalized, but because of the intial fear of resources and space, it would also be a key forecast for medical communities to be prepared for potential next round of patients.</p>
 <p>We have seen that the research suggests ‘that most people who contract the new coronavirus develop mild cases of Covid-19’ from an article released in June that can be found <a href="https://www.advisory.com/daily-briefing/2020/06/01/asymptomatic-patients">here</a>. Due to this fact of likely a-symptomatic patients, hospitalization metrics reveal themselves to be a more accurate representation of severe cases.</p>
 <p>Originally we were going to evaluate the new COVID hospitalization cases. However, upon closer review it became clear that large states that were hit the hardest were failling to reporting this metric. We were able to confirm this analysis when we compared the New versus Current metrics and see that there is a large spike in the hospitalization cases overall, but we are not seeing the same results reflected in the New COVID cases metric. Therefore, we err on the side of caution and move forward with modeling our Currently COVID hospitalized metric.</p>
-<p>Looking at a more micro view of currently hospitalized COVID cases shows us much more behavior that we might be able to evaluate moving forward. Below we can see what appears to be heavy wandering behavior and if we look closely, some additiona noise that could be pseudo-cyclic behavior hidden by the large numbers.</p>
+<p>Looking at a more micro view of currently hospitalized COVID cases shows us much more behavior that we might be able to evaluate moving forward. Below we can see what appears to be heavy wandering behavior and if we look closely, some additional noise that could be pseudo-cyclic behavior hidden by the large numbers.</p>
 <pre class="r"><code>ggplot(data = us, aes(x=date, y=hospitalizedIncrease))+
   geom_line(color=&quot;orange&quot;)+
   labs(title = &quot;New COVID Hospitalized Cases US&quot;, y = &quot;Thousands&quot;, x = &quot;&quot;) +

@@ -139,7 +139,7 @@ We have seen that the research suggests 'that most people who contract the new c
 
 Originally we were going to evaluate the new COVID hospitalization cases. However, upon closer review it became clear that large states that were hit the hardest were failling to reporting this metric. We were able to confirm this analysis when we compared the New versus Current metrics and see that there is a large spike in the hospitalization cases overall, but we are not seeing the same results reflected in the New COVID cases metric. Therefore, we err on the side of caution and move forward with modeling our Currently COVID hospitalized metric. 
 
-Looking at a more micro view of currently hospitalized COVID cases shows us much more behavior that we might be able to evaluate moving forward. Below we can see what appears to be heavy wandering behavior and if we look closely, some additiona noise that could be pseudo-cyclic behavior hidden by the large numbers.
+Looking at a more micro view of currently hospitalized COVID cases shows us much more behavior that we might be able to evaluate moving forward. Below we can see what appears to be heavy wandering behavior and if we look closely, some additional noise that could be pseudo-cyclic behavior hidden by the large numbers.
 
 ```{r}
 ggplot(data = us, aes(x=date, y=hospitalizedIncrease))+
