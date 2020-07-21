@@ -53,7 +53,7 @@ Spectral Density
 - What apepars to be a wave through the rest of the graph- this could be a hidden seasonailty cause another freq peak that is hidden by the pseudo-cyclic behavior mentioned in about the realization above.
 
 ```{r}
-plotts.sample.wge(us$hospitalizedCurrently)
+plotts.sample.wge(us$hospitalizedCurrently, lag.max = 100)
 ```
 
 ### Overfit tables
@@ -68,14 +68,14 @@ est.ar.wge(us$hospitalizedCurrently,p=6,type='burg')
 Once the data has been differed we something that looks much closer to a stationary data set. However, we have also surfaced what appears to be a small seasonality component. We see the ACF have higher spikes surface at 7 and 14, which would lead us to believe there is a 7 day seasonal component.
 
 ```{r}
-us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1)
+us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
 ```
 
 ### Seasonailty Transformation
 Above we have surfaced what appears to be a 7 day seasonality trend. We will now transform the data for the s=7.
 
 ```{r}
-us.diff.seas = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1))
+us.diff.seas = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
 ```
 
 ### Diagnose Model w/ aic.wge
@@ -112,34 +112,13 @@ mean(us$hospitalizedCurrently)
 #### ARMA(5,1)
 ARMA(5,1) Short Term
 ```{r}
-shortARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 7, lastn = FALSE, limits = FALSE)
+shortARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 7, lastn = F, limits = F)
 ```
 
 - ASE
 ```{r}
-ASEshortARMA1 = mean((us$hospitalizedCurrently[(124-7+1):124]-shortARMA$f)^2)
-ASEshortARMA1 
-
-ASEshortARMA2 = mean((shortARMA$f-us$hospitalizedCurrently[(length(us$hospitalizedCurrently)-6):length(us$hospitalizedCurrently)])^2)
-ASEshortARMA2
-```
-
-- Windowed ASE
-```{r}
-```
-
-ARMA(5,1) Long Term
-```{r}
-longARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = FALSE, limits = FALSE)
-```
-
-- ASE
-```{r}
-ASElongARMA1 = mean((us$hospitalizedCurrently[(124-90+1):124]-shortARMA$f)^2)
-ASElongARMA1 
-
-ASElongARMA2 = mean((shortARMA$f-us$hospitalizedCurrently[(length(us$hospitalizedCurrently)-89):length(us$hospitalizedCurrently)])^2)
-ASElongARMA2
+ASEshortARMA = mean((us$hospitalizedCurrently[(124-7+1):124]-shortARMA$f)^2)
+ASEshortARMA 
 ```
 
 - Windowed ASE
@@ -147,19 +126,17 @@ ASElongARMA2
 phis = est.us.diff.seasAIC$phi
 thetas = est.us.diff.seasAIC$theta
 
-trainingSize = 25
-horizon = 12
+trainingSize = 24
+horizon = 7
 ASEHolder = numeric()
 
 for( i in 1:(124-(trainingSize + horizon) + 1))
 {
-  
   forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
   
   ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - shortARMA$f)^2)
          
   ASEHolder[i] = ASE
-
 }
 ```
 
@@ -179,15 +156,142 @@ ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-
 ASE
 ```
 
+ARMA(5,1) Long Term
+```{r}
+longARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = F, limits = F)
+```
+
+- ASE
+```{r}
+ASElongARMA = mean((us$hospitalizedCurrently[(124-90+1):124]-longARMA$f)^2)
+ASElongARMA 
+```
+
+- Windowed ASE
+```{r, fig.show="hide", warning=FALSE}
+phis = est.us.diff.seasAIC$phi
+thetas = est.us.diff.seasAIC$theta
+
+trainingSize = 24
+horizon = 90
+ASEHolder = numeric()
+
+for( i in 1:(124-(trainingSize + horizon) + 1))
+{
+  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
+  
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - longARMA$f)^2)
+         
+  ASEHolder[i] = ASE
+}
+```
+
+```{r}
+invisible(ASEHolder)
+hist(ASEHolder)
+WindowedASE = mean(ASEHolder)
+
+summary(ASEHolder)
+WindowedASE
+```
+
+** NEED TO FIGURE OUT WHY 90 DAY FORECAST ISN'T GRAPHING WINDOWED ASE**
+```{r}
+#i = 45
+#fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1, n.ahead = 90, lastn = T)
+#ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
+#ASE
+```
+
 #### AR(2)
 
 AR(2) Short Term
 ```{r}
-shortAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d = 1, s = 7, n.ahead = 7, lastn = FALSE, limits = FALSE)
+shortAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
+
+- ASE
+```{r}
+ASEshortAR = mean((us$hospitalizedCurrently[(124-7+1):124]-shortAR$f)^2)
+ASEshortAR 
+```
+
+- Windowed ASE
+```{r, fig.show="hide", warning=FALSE}
+phis = est.us.diff.seasBIC$phi
+
+trainingSize = 24
+horizon = 7
+ASEHolder = numeric()
+
+for( i in 1:(124-(trainingSize + horizon) + 1))
+{
+  forecasts = fore.arma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis,n.ahead = horizon)
+  
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - shortAR$f)^2)
+         
+  ASEHolder[i] = ASE
+}
+```
+
+```{r}
+invisible(ASEHolder)
+hist(ASEHolder)
+WindowedASE = mean(ASEHolder)
+
+summary(ASEHolder)
+WindowedASE
+```
+
+```{r}
+i = 45
+fs = fore.arma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis,n.ahead = 7, lastn = TRUE)
+ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
+ASE
+```
+
 
 AR(2) Long Term
 ```{r}
-longAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d = 1, s = 7, n.ahead = 90, lastn = FALSE, limits = FALSE)
+longAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
 
+- ASE
+```{r}
+ASElongAR = mean((us$hospitalizedCurrently[(124-90+1):124]-longAR$f)^2)
+ASElongAR 
+```
+
+- Windowed ASE
+```{r, fig.show="hide", warning=FALSE}
+phis = est.us.diff.seasBIC$phi
+
+trainingSize = 24
+horizon = 90
+ASEHolder = numeric()
+
+for( i in 1:(124-(trainingSize + horizon) + 1))
+{
+  forecasts = fore.arma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis,n.ahead = horizon)
+  
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - longAR$f)^2)
+         
+  ASEHolder[i] = ASE
+}
+```
+
+```{r}
+invisible(ASEHolder)
+hist(ASEHolder)
+WindowedASE = mean(ASEHolder)
+
+summary(ASEHolder)
+WindowedASE
+```
+
+```{r}
+#i = 45
+#fs = fore.arma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis,n.ahead = 90, lastn = TRUE)
+#ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
+#ASE
+```
