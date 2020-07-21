@@ -1,5 +1,5 @@
 ---
-title: 'US Goal 2'
+title: 'Goal 2 Univaraite: US'
 author: "Jaclyn A Coate"
 date: "7/21/2020"
 output: html_document
@@ -115,9 +115,68 @@ ARMA(5,1) Short Term
 shortARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
 
+- ASE
+```{r}
+ASEshortARMA1 = mean((us$hospitalizedCurrently[(124-7+1):124]-shortARMA$f)^2)
+ASEshortARMA1 
+
+ASEshortARMA2 = mean((shortARMA$f-us$hospitalizedCurrently[(length(us$hospitalizedCurrently)-6):length(us$hospitalizedCurrently)])^2)
+ASEshortARMA2
+```
+
+- Windowed ASE
+```{r}
+```
+
 ARMA(5,1) Long Term
 ```{r}
 longARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = FALSE, limits = FALSE)
+```
+
+- ASE
+```{r}
+ASElongARMA1 = mean((us$hospitalizedCurrently[(124-90+1):124]-shortARMA$f)^2)
+ASElongARMA1 
+
+ASElongARMA2 = mean((shortARMA$f-us$hospitalizedCurrently[(length(us$hospitalizedCurrently)-89):length(us$hospitalizedCurrently)])^2)
+ASElongARMA2
+```
+
+- Windowed ASE
+```{r, results="hide"}
+phis = est.us.diff.seasAIC$phi
+thetas = est.us.diff.seasAIC$theta
+
+trainingSize = 25
+horizon = 12
+ASEHolder = numeric()
+
+for( i in 1:(124-(trainingSize + horizon) + 1))
+{
+  
+  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
+  
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - shortARMA$f)^2)
+         
+  ASEHolder[i] = ASE
+
+}
+```
+
+```{r}
+invisible(ASEHolder)
+hist(ASEHolder)
+WindowedASE = mean(ASEHolder)
+
+summary(ASEHolder)
+WindowedASE
+```
+
+```{r}
+i = 45
+fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = 7, lastn = TRUE)
+ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
+ASE
 ```
 
 #### AR(2)
