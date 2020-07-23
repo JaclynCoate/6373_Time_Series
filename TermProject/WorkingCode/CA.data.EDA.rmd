@@ -48,12 +48,12 @@ head(CA)
 #Daily New Confirmed Cases
 ggplot(data=CA, aes(x=date, y=newcountconfirmed, group=1)) + 
   geom_line(color="gold") + ggtitle("New Confirmed COVID-19 Cases in CA") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_fivethirtyeight()
 
 #New Tests
 ggplot(data=CA, aes(x=date, y=newtested, group=1)) + 
   geom_line(color="green2") + ggtitle("New COVID-19 Tests in CA") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_fivethirtyeight()
 ```
 
 There are 2 large spikes in test numbers; these were due to a backlog in data from San Francisco on tests administered.
@@ -61,12 +61,12 @@ There are 2 large spikes in test numbers; these were due to a backlog in data fr
 #Hospitalizated Patients
 ggplot(data=CA, aes(x=date, y=hospitalized_covid_confirmed_patients, group=1)) + 
   geom_line(color="orange") + ggtitle("Hospitalized Patients Confirmed with COVID-19 in CA") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_fivethirtyeight()
 
 #Daily Deaths
 ggplot(data=CA, aes(x=date, y=newcountdeaths, group=1)) + 
   geom_line(color="darkred") + ggtitle("Daily COVID-19 Related Deaths in CA") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_fivethirtyeight()
 
 ```
 
@@ -76,7 +76,7 @@ ggplot(data=CA) +
   geom_line(data=CA,aes(x=date, y=pospercent_14dayavg), color="blue") + 
   geom_line(data=CA,aes(x=date, y=newpospercent), color="green3") +
   ggtitle("CA: Daily Positivity Rate (Green) and 14 Day Avg Pos Rate (Blue)") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Percent")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Percent")+ theme_fivethirtyeight()
 ```
 
 The rolling average of the past 14 days is the measure of positive percent being reported by the California state government each day. Overlaying this over the daily positive test rate, this does appear to be a good way to smooth the data in a sensible way, spreading out the effects of potential lag between tests and results as well as the changes in availability of testing at different times in the week.
@@ -88,17 +88,17 @@ The rolling average of the past 14 days is the measure of positive percent being
 #Cumulative total Cases
 ggplot(data=CA, aes(x=date, y=totalcountconfirmed, group=1)) + 
   geom_line(color="gold") + ggtitle("Cumulative Total COVID-19 Confirmed Cases in CA") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_fivethirtyeight()
 
 #Cumulative total Tests
 ggplot(data=CA, aes(x=date, y=testedtotal, group=1)) + 
   geom_line(color="green2") + ggtitle("Cumulative Total COVID-19 Tests in CA") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_fivethirtyeight()
 
 #Cumulative total Deaths
 ggplot(data=CA, aes(x=date, y=totalcountdeaths, group=1)) + 
   geom_line(color="darkred") + ggtitle("Cumulative Total COVID-19 Related Deaths in CA") + 
-  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_minimal()
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count")+ theme_fivethirtyeight()
 ```
 
 
@@ -115,7 +115,7 @@ ggplot(data=CA) +
   geom_line(data=CA,aes(x=date, y=Totalhosp, color="Confirmed + Suspected COVID Patients")) +
   ggtitle("Hospitalized COVID-19 Patients in CA") + 
   scale_x_date(date_labels = "%b") + labs(x="", y="Patients", color = "") +scale_color_manual(values = colors) +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 Because the availability of tests has increased over time, using the total hospitalized patients (confirmed + suspected) might be the best representation even though there is a possibility that some suspected cases may not actually be COVID-related. 
@@ -130,7 +130,7 @@ ggplot(data=CA) +
   geom_line(data=CA,aes(x=date, y=newcountconfirmed, color="New positive cases")) +
   ggtitle("Hospitalized COVID-19 Patients vs New Cases in CA") + 
   scale_x_date(date_labels = "%b") + labs(x="", y="Patients", color = "") +scale_color_manual(values = colors) +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 
@@ -271,7 +271,7 @@ We established that there is little no cyclic behavior to model, but a non-stati
 
 ```{r}
 Totalhosp2 <- Totalhosp[90:119] #This is only the hospitalized patients data from late June to present
-
+parzen.wge(Totalhosp2)
 #Differencing the data: We want a second difference so that the current trend will continue
 Totalhosp2_d1 <- artrans.wge(Totalhosp2, phi.tr = 1) #acf makes it look like there might be a cycle
 acf(Totalhosp2_d1) # the "cycle" is not significant
