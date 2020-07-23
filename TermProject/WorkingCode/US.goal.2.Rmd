@@ -40,7 +40,7 @@ Traits:
 ggplot(data = us, aes(x=date, y=hospitalizedCurrently))+
   geom_line(color="orange")+
   labs(title = "Current COVID Hospitalized Cases US", y = "Thousands", x = "") +
-    theme_minimal()
+    theme_fivethirtyeight()
 ```
 
 ### Sample Realization, ACF, and Spectral Density

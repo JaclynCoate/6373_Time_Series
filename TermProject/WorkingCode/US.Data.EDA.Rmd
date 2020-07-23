@@ -93,9 +93,9 @@ library(ggplot2)
 library(ggthemes)
 
 ggplot(data = us, aes(x=date, y=positive))+
-  geom_line(color="gold")+
+  geom_line(color="black")+
   labs(title = "Cumulative COVID Cases US", y = "Millions", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ### Cumulative COVID Hospitalized Cases in US
@@ -105,7 +105,7 @@ The total hospitilizations due to covid appear to also increase over time. We do
 ggplot(data = us, aes(x=date, y=hospitalizedCumulative))+
   geom_line(color="orange")+
   labs(title = "Cumulative COVID Hospitalized Cases US", y = "Millions", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ### Cumulative COVID Related Deaths in US
@@ -115,7 +115,7 @@ The cumulative deaths are also increasing over time. We can clearly see what app
 ggplot(data = us, aes(x=date, y=death))+
   geom_line(color="dark red")+
   labs(title = "Cumulative COVID Death Cases US", y = "100 Thousands", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ## New and Currently COVID Case Variable Review
@@ -127,9 +127,9 @@ Newly confirmed cases have a little more inforamtion to tell use from a trend pe
 
 ```{r}
 ggplot(data = us, aes(x=date, y=positiveIncrease))+
-  geom_line(color="gold")+
+  geom_line(color="black")+
   labs(title = "New COVID Cases US", y = "Thousands", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ### Currently COVID Hospitalizations in US
@@ -145,12 +145,12 @@ Looking at a more micro view of currently hospitalized COVID cases shows us much
 ggplot(data = us, aes(x=date, y=hospitalizedIncrease))+
   geom_line(color="orange")+
   labs(title = "New COVID Hospitalized Cases US", y = "Thousands", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 
 ggplot(data = us, aes(x=date, y=hospitalizedCurrently))+
   geom_line(color="orange")+
   labs(title = "Current COVID Hospitalized Cases US", y = "Thousands", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ### New COVID Deaths in US
@@ -160,7 +160,7 @@ When we review the new death cumulative count we can see what again appears to b
 ggplot(data = us, aes(x=date, y=deathIncrease))+
   geom_line(color="dark red")+
   labs(title = "New COVID Death Cases US", y = "Thousands", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ## Caculated Variables Creation & Review
@@ -175,9 +175,9 @@ While this metric is better than just new cases to forecast severity (it normali
 us$posRate <- us$positive / us$totalTestResults
 
 ggplot(data = us, aes(x=date, y=posRate))+
-  geom_line(color="gold")+
+  geom_line(color="black")+
   labs(title = "Daily Positivity Rate COVID Testing US", y = "Rate", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ### Hospitalization Rate
@@ -191,7 +191,7 @@ us$hospRate <- us$hospitalizedCumulative / us$positive
 ggplot(data = us, aes(x=date, y=hospRate))+
   geom_line(color="dark orange")+
   labs(title = "Daily Hospitalization Rate COVID Testing US", y = "Rate", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ### Recovery Rate
@@ -205,7 +205,7 @@ us$recRate <- us$recovered / us$positive
 ggplot(data = us, aes(x=date, y=recRate))+
   geom_line(color="dark green")+
   labs(title = "Daily Recovery Rate COVID Testing US", y = "Rate", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ### Death Rate
@@ -219,7 +219,7 @@ us$deathRate <- us$death / us$positive
 ggplot(data = us, aes(x=date, y=deathRate))+
   geom_line(color="dark red")+
   labs(title = "Daily Death Rate COVID Testing US", y = "Rate", x = "") +
-  theme_minimal()
+  theme_fivethirtyeight()
 ```
 
 ## Matrix Scatterplot of Surfaced Variables
