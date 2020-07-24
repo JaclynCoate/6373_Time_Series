@@ -5,10 +5,10 @@ The purpose of this repository is to share our collaborative work in order to co
 
 ## Github Case Study Structure
 * [Final Deck] - final presenations
-* [WorkingCode] - contains individual code books for different required sections of the project
+* [Working Code] - contains individual code books for different required sections of the project
 * [Requirements] - term project documentation and rubric
 * [Data] - chosen data sources
-* [Videos] - presentation video portions
+* [Recordings] - presentation video portions
 
 ## Contributors
 Please contact any of the members below: 
@@ -16,7 +16,7 @@ Please contact any of the members below:
  - Josh Eysenbach: jeysenbach@smu.edu
 
  [Final Deck]: <>
- [WorkingCode]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/WorkingCode>
+ [Working Code]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/WorkingCode>
  [Requirements]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Requirements>
  [Data]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Data>
- [Videos]: <>
+ [Recordings]: <>
