@@ -15,8 +15,8 @@ Please contact any of the members below:
  - Jaclyn Coate: jcoate@smu.edu 
  - Josh Eysenbach: jeysenbach@smu.edu
 
- [Final Deck]: <>
+ [Final Deck]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/FinalDeck>
  [Working Code]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/WorkingCode>
  [Requirements]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Requirements>
  [Data]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Data>
- [Recordings]: <>
+ [Recordings]: <https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Recordings>
