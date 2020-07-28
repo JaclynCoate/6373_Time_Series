@@ -1,0 +1,286 @@
+---
+title: "Goal 3 Multivariate: US"
+author: "Jaclyn A Coate"
+date: "7/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(ggthemes)
+library(vars)
+library(nnfor)
+library(tswge)
+```
+
+# US COVID Data
+
+## Data Prep
+
+```{r load data}
+us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
+us <- transform(us, date = as.Date(as.character(date), "%Y%m%d"))
+us <- subset(us, select = -c(states, dateChecked, hospitalized, lastModified, total, posNeg, totalTestResultsIncrease, hash))
+us[is.na(us)] <- 0
+#Selecting only those dates with reported current hospitilizations
+#us <- dplyr::slice(us,1:132)
+us = us[order(as.Date(us$date, format = "%Y%m%d")),]
+head(us)
+```
+
+### Current Hospitalization Realization
+Traits:
+
+- Heavy wandering behavior 
+- What appears to be some noise that could be pseudo-cyclic behavior hidden by the large numbers.
+
+```{r}
+ggplot(data = us, aes(x=date, y=hospitalizedCurrently))+
+  geom_line(color="orange")+
+  labs(title = "Current COVID Hospitalized Cases US", y = "Thousands", x = "") +
+    theme_fivethirtyeight()
+```
+
+## Stationarity
+
+It is difficult to assume stationarity for this data due to multiple factors. We are working under the assumption that COVID is a novel virus and cases as well as hospitalizations will eventually return to zero. This being said our current modeling techniques do things such as return to the median or mimic the previously seen trends. Also, we see a heavy wandering trend in both new cases and hospitalization would be dependent on this as well as time. We will review the data and see what, if any, non-stationary components reveal themselves and model the data accordingly.
+
+## Forecast Current Hospitalizations
+It is difficult to assume stationarity for this data due to multiple factors. We are working under the assumption that COVID is a novel virus and cases as well as hospitalizations will eventually return to zero. This being said our current modeling techniques do things such as return to the median or mimic the previously seen trends. Also, we see a heavy wandering trend in both new cases and hospitalization would be dependent on this as well as time. We will review the data and see what, if any, non-stationary components reveal themselves and model the data accordingly.
+
+## Variable Review
+
+When reviewing the variables and the scatter plot from our previous EDA we can see that there are some correlations that were expected, for example *currentHospitalizations* is correlated with the variables that refelct ICU and Ventilaor patients. These metrics wouldn't exist without hospitalizations. These variables also cannot help up predict hospitalizations because they after occurances. So we will actually be leveraing variables such as *positive* and *positive increase* in order to see if there is some sort of correlation between hospitalized patients and the number of positive cases.
+
+- Positive Tests Trend
+
+```{r}
+ggplot(data = us, aes(x=date, y=positive))+
+  geom_line(color="orange")+
+  labs(title = "Total Cases US", y = "Millions", x = "") +
+    theme_fivethirtyeight()
+```
+
+- Positive Increase Trend
+
+```{r}
+ggplot(data = us, aes(x=date, y=positiveIncrease))+
+  geom_line(color="orange")+
+  labs(title = "Increase in COVID Cases US", y = "Thousands", x = "") +
+    theme_fivethirtyeight()
+```
+
+### MLR w/ Correlated Errors for Currently Hospitalized Patients
+#### Forecast Independent Variables
+
+1. Forecast COVID cases
+    a. Evaluation: Heavy wandering, frequency peak at 0, and slowly dampening ACF consistend with (1-B) component
+    b. Differencing Data: still observe a slowly dampening ACF, secondary (1-B) transformation
+    c. Differencing Data: much more stationary data and have surfaced a seasonaly component = 7 seen on ACF peaks at 7, 14, 21
+    d. Seaonality Transformation: stationary data, and an ACF that reflects data other than whitenoise to be modeled.
+    e. Model IDing: diagnose with aic.wge to determine phi, thetas: Both AIC/BIC select ARMA(4,2)
+    f. White Noise Test: Reject the H_null and accept this data is not white noise
+    g. Estiamte Phis, Thetas: 
+    h. Model Building
+    i. Forecast 7/90 Days 
+
+```{r}
+#a
+plotts.sample.wge(us$positive)
+#b
+pos.diff = artrans.wge(us$positive, phi.tr = 1, lag.max = 100)
+#c
+pos.diff.2 = artrans.wge(pos.diff, phi.tr = 1, lag.max = 100)
+#d
+pos.diff.seas = artrans.wge(pos.diff.2,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+#e
+aic5.wge(pos.diff.seas)
+aic5.wge(pos.diff.seas, type = "bic")
+#f
+acf(pos.diff.seas)
+ljung.wge(pos.diff.seas)$pval
+#ljung.wge(pos.diff.seas, K = 48)$pval
+#g
+est.pos.seas = est.arma.wge(pos.diff.seas, p = 4, q = 2)
+mean(us$positive)
+#h
+#Equation building
+#i
+pos.preds7 = fore.aruma.wge(us$positive, phi = est.pos.seas$phi, theta = est.pos.seas$theta, d=2, s=7, n.ahead = 7)
+pos.preds90 = fore.aruma.wge(us$positive, phi = est.pos.seas$phi, theta = est.pos.seas$theta, d=2, s=7, n.ahead = 90)
+
+plot(seq(1,187,1), us$positive, type = "l", xlim = c(0,195), ylim = c(0,5000000), ylab = "Positive COVID Cases", main = "7 Day COVID Cases Forecast")
+lines(seq(188, 194,1), pos.preds7$f, type = "l", col = "red")
+
+plot(seq(1,187,1), us$positive, type = "l", xlim = c(0,280), ylim = c(0,9000000), ylab = "Positive COVID Cases", main = "90 Day COVID Cases Forecast")
+lines(seq(188, 277,1), pos.preds90$f, type = "l", col = "red")
+```
+
+2. Forecast Increase Positive Cases
+    a. Evaluation: Slowly dampening ACF and heavy wandering consistent with a (1-B) factor. As well as frequency peaks at 0 and .14. Consistent with (1-B) and seasonailty component of 7.
+
+```{r}
+#a
+plotts.sample.wge(us$positiveIncrease)
+```
+    b. Differencing Data: much more stationary data and have surfaced a seasonaly component = 7 seen on ACF peaks at 7, 14, 21
+
+```{r}
+#b
+inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
+```
+    c. Seaonality Transformation: stationary data, and an ACF that reflects data other than whitenoise to be modeled.
+    
+```{r}
+#c
+inpos.diff.seas = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+```
+    d. Model IDing: diagnose with aic.wge to determine phi, thetas: Both AIC/BIC select ARMA(4,2)
+
+```{r}
+#d
+aic5.wge(inpos.diff.seas)
+aic5.wge(inpos.diff.seas, type = "bic")
+```
+    e. White Noise Test: Reject the H_null and accept this data is not white noise
+    
+```{r}
+#e
+acf(inpos.diff.seas)
+ljung.wge(inpos.diff.seas)$pval
+```
+    f. Estiamte Phis, Thetas: 
+    g. Model Building
+    
+```{r}
+#f
+est.inpos.seas = est.arma.wge(inpos.diff.seas, p = 4, q = 2)
+mean(us$positiveIncrease)
+#g
+```
+    h. Forecast 7/90 Days 
+    
+```{r}
+#h
+inpos.preds7 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, theta = est.inpos.seas$theta, d=1, s=7, n.ahead = 7)
+inpos.preds90 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, theta = est.inpos.seas$theta, d=1, s=7, n.ahead = 90)
+```
+    i. Plotting forecasts
+    
+```{r}
+plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,195), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "7 Day Increase in COVID Cases Forecast")
+lines(seq(188, 194,1), inpos.preds7$f, type = "l", col = "red")
+
+plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,280), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "7 Day Increase in COVID Cases Forecast")
+lines(seq(188, 277,1), inpos.preds90$f, type = "l", col = "red")
+```
+
+
+#### Forecast Currently Hospitalized Patients depend on above variable forecasts
+
+1. Fit simple regression model predicting *hospitalizedCurrently* with *positive*, *positiveIncrease* and a trend.
+
+```{r} 
+us.mlr.fit = lm(hospitalizedCurrently~positiveIncrease,positive, date, data=us)
+summary(us.mlr.fit)
+```
+
+2. Diagnose with aic.wge and see what the p, q would be with residuals from above model
+    a. Below we can see that our aic.wge function has selected an AR(6) model for modeling our cmort information.
+
+```{r}
+us.mlr.phi= aic.wge(us.mlr.fit$residuals, p = 0:8, q = 0:0)
+us.mlr.phi
+```
+
+3. Now forcast with arima function with phi's from above coefficients and AR(6) model
+
+```{r}
+us.mlr.model = arima(us$hospitalizedCurrently, order = c(us.mlr.phi$p,1,us.mlr.phi$q), seasonal = list(order = c(1,0,0), period = 7), xreg = cbind(us$positive, us$hospitalizedIncrease, us$date))
+us.mlr.model
+AIC(us.mlr.model)
+```
+
+4. Now we check the residuals for white noise from our above model
+
+```{r}
+acf(us.mlr.model$residuals) #Visual ACF test
+us.mlr.wn.test = ljung.wge(us.mlr.model$residuals)
+us.mlr.wn.test$pval
+```
+
+5. With the inability to reject the N null for the white noise test for an MLR model w/ correlated errors we will have to settle on the model being white noise with a seasonal and (1-B) component.
+
+6. Forecast
+
+```{r}
+#us7 = 
+
+```
+
+```{r}
+#us90
+```
+
+```{r example code}
+# Model cmort based on predicted part and temp using MLR with Cor Erros
+#assuming data is loaded in dataframe CM
+#ksfit = lm(cmort~temp+part+Week, data = CM)
+#phi = aic.wge(ksfit$residuals) #AR(2)
+
+#fit = arima(CM$cmort,order = c(phi$p,0,phi$q), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CM$temp, CM$part, CM$Week))
+
+#AIC(fit) #3166
+
+# Check for whiteness of residuals
+#acf(fit$residuals)
+#ljung.wge(fit$residuals) # pval = .059
+#ljung.wge(fit$residuals, K = 48) # pval = .004
+
+#load the forecasted Part and Temp in a data frame
+#next20 = data.frame(temp = predsTemp$f, part = predsPart$f, Week = seq(509,528,1))
+#get predictions
+#predsCMort = predict(fit,newxreg = next20)
+#plot next 20 cmort wrt time
+#plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+#lines(seq(509,528,1), predsCMort$pred, type = "l", col = "red")
+```
+
+
+
+#### VAR Model
+
+1. Creating train / test data 
+
+```{r}
+library(vars)
+usTrain.var = us[1:122,]
+usTrain.var
+```
+
+2. Fit VAR mode
+
+```{r}
+us.var.fit = VAR(cbind(usTrain.var$hospitalizedCurrently, usTrain.var$positive, usTrain.var$positiveIncrease), lag.max = 14, type = "both")
+```
+
+3. Predictions
+
+```{r}
+pred.var = predict(us.var.fit, n.ahead = 10)
+```
+
+4. Plot predictions / actual
+
+```{r}
+plot(us$hospitalizedCurrently, type = "l")
+lines(seq(123,132,1),pred.var$fcst$y1[,1],col="red")
+```
+
+5. Calculate ASE
+
+```{r}
+varASE = mean((us$hospitalizedCurrently[123:132]-pred.var$fcst$y1[1:10])^2)
+varASE
+```
