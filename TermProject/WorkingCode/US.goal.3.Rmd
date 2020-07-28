@@ -76,40 +76,62 @@ ggplot(data = us, aes(x=date, y=positiveIncrease))+
 
 1. Forecast COVID cases
     a. Evaluation: Heavy wandering, frequency peak at 0, and slowly dampening ACF consistend with (1-B) component
-    b. Differencing Data: still observe a slowly dampening ACF, secondary (1-B) transformation
-    c. Differencing Data: much more stationary data and have surfaced a seasonaly component = 7 seen on ACF peaks at 7, 14, 21
-    d. Seaonality Transformation: stationary data, and an ACF that reflects data other than whitenoise to be modeled.
-    e. Model IDing: diagnose with aic.wge to determine phi, thetas: Both AIC/BIC select ARMA(4,2)
-    f. White Noise Test: Reject the H_null and accept this data is not white noise
-    g. Estiamte Phis, Thetas: 
-    h. Model Building
-    i. Forecast 7/90 Days 
-
+    
 ```{r}
 #a
 plotts.sample.wge(us$positive)
+```
+    b. Differencing Data: still observe a slowly dampening ACF, secondary (1-B) transformation
+    
+```{r}
 #b
 pos.diff = artrans.wge(us$positive, phi.tr = 1, lag.max = 100)
+```
+    c. Differencing Data: much more stationary data and have surfaced a seasonaly component = 7 seen on ACF peaks at 7, 14, 21
+    
+```{r}
 #c
 pos.diff.2 = artrans.wge(pos.diff, phi.tr = 1, lag.max = 100)
+```
+    d. Seaonality Transformation: stationary data, and an ACF that reflects data other than whitenoise to be modeled.
+    
+```{r}
 #d
 pos.diff.seas = artrans.wge(pos.diff.2,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+```
+    e. Model IDing: diagnose with aic.wge to determine phi, thetas: Both AIC/BIC select ARMA(4,2)
+    
+```{r}
 #e
 aic5.wge(pos.diff.seas)
 aic5.wge(pos.diff.seas, type = "bic")
+```
+    f. White Noise Test: Reject the H_null and accept this data is not white noise
+    
+```{r}
 #f
 acf(pos.diff.seas)
 ljung.wge(pos.diff.seas)$pval
 #ljung.wge(pos.diff.seas, K = 48)$pval
+```
+    g. Estiamte Phis, Thetas: 
+```{r}
 #g
 est.pos.seas = est.arma.wge(pos.diff.seas, p = 4, q = 2)
 mean(us$positive)
+```
+    h. Model Building
+    i. Forecast 7/90 Days 
+```{r}
 #h
 #Equation building
 #i
 pos.preds7 = fore.aruma.wge(us$positive, phi = est.pos.seas$phi, theta = est.pos.seas$theta, d=2, s=7, n.ahead = 7)
 pos.preds90 = fore.aruma.wge(us$positive, phi = est.pos.seas$phi, theta = est.pos.seas$theta, d=2, s=7, n.ahead = 90)
-
+```
+    i. Plotting forecasts
+    
+```{r}
 plot(seq(1,187,1), us$positive, type = "l", xlim = c(0,195), ylim = c(0,5000000), ylab = "Positive COVID Cases", main = "7 Day COVID Cases Forecast")
 lines(seq(188, 194,1), pos.preds7$f, type = "l", col = "red")
 
@@ -210,42 +232,54 @@ us.mlr.wn.test = ljung.wge(us.mlr.model$residuals)
 us.mlr.wn.test$pval
 ```
 
-5. With the inability to reject the N null for the white noise test for an MLR model w/ correlated errors we will have to settle on the model being white noise with a seasonal and (1-B) component.
+#### With the inability to reject the N null for the white noise test for an MLR model w/ correlated errors we will have to settle on the model being white noise with a seasonal and (1-B) component.
 
-6. Forecast
-
-```{r}
-#us7 = 
-
-```
+5. Load the forecasted positive and increase positive in a data frame
 
 ```{r}
-#us90
+regressions7 = data.frame(positiveIncrease = inpos.preds7$f, positive = pos.preds7$f, date = seq(188,194,1))
+regressions7
+regressions90 = data.frame(positiveIncrease = inpos.preds90$f, positive = pos.preds90$f, date = seq(188,277,1))
+regressions90
 ```
 
-```{r example code}
-# Model cmort based on predicted part and temp using MLR with Cor Erros
-#assuming data is loaded in dataframe CM
-#ksfit = lm(cmort~temp+part+Week, data = CM)
-#phi = aic.wge(ksfit$residuals) #AR(2)
+6. Predictions
 
-#fit = arima(CM$cmort,order = c(phi$p,0,phi$q), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CM$temp, CM$part, CM$Week))
+```{r}
+us7 = predict(us.mlr.model, newxreg = regressions7)
 
-#AIC(fit) #3166
+us90 = predict(us.mlr.model, newxreg = regressions90)
+```
 
-# Check for whiteness of residuals
-#acf(fit$residuals)
-#ljung.wge(fit$residuals) # pval = .059
-#ljung.wge(fit$residuals, K = 48) # pval = .004
+7. Plotted Forecasts
 
-#load the forecasted Part and Temp in a data frame
-#next20 = data.frame(temp = predsTemp$f, part = predsPart$f, Week = seq(509,528,1))
+```{r}
+plot(seq(1,187,1), us$hospitalizedCurrently, type = "l", xlim = c(0,195), ylim = c(0,3000000), ylab = "Currently Hospitalized COVID Cases", main = "7 Day Forecast for COVID Hospitalized Cases")
+lines(seq(188,194,1), us7$pred, type = "l", col = "red")
+```
+
+8. ASE
+
+```{r}
+#Find ASE  Need to forecast last 30 of known series.  
+#CMsmall = CM[1:478,]
+#ksfit = lm(cmort~temp+part+Week, data = CMsmall)
+#phi = aic.wge(ksfit$residuals)
+#fit = arima(CMsmall$cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CMsmall$temp, CMsmall$part, CMsmall$Week))
+
+#AIC(fit) #2990.101
+
+#last30 = data.frame(temp = CM$temp[479:508], part = CM$part[479:508], CMWeek = seq(479,508,1))
 #get predictions
-#predsCMort = predict(fit,newxreg = next20)
-#plot next 20 cmort wrt time
-#plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
-#lines(seq(509,528,1), predsCMort$pred, type = "l", col = "red")
+#predsCMort = predict(fit,newxreg = last30)
+
+#ASE = mean((CM$cmort[479:508] - predsCMort$pred)^2)
+#ASE #84.2398
+
+#plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "Last 30 Week Cardiac Mortality Forecast")
+#lines(seq(479,508,1), predsCMort$pred, type = "l", col = "red")
 ```
+
 
 
 
