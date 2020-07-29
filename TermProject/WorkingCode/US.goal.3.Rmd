@@ -74,7 +74,7 @@ ggplot(data = us, aes(x=date, y=positiveIncrease))+
 ### MLR w/ Correlated Errors for Currently Hospitalized Patients
 #### Forecast Independent Variables
 
-1. Forecast COVID cases
+1. Forecast COVID Cases
     a. Evaluation: Heavy wandering, frequency peak at 0, and slowly dampening ACF consistend with (1-B) component
     
 ```{r}
@@ -184,27 +184,36 @@ mean(us$positiveIncrease)
     h. Forecast 7/90 Days 
     
 ```{r}
-#h
+#7 day
 inpos.preds7 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, theta = est.inpos.seas$theta, d=1, s=7, n.ahead = 7)
+```
+
+```{r}
+#90 day
 inpos.preds90 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, theta = est.inpos.seas$theta, d=1, s=7, n.ahead = 90)
 ```
     i. Plotting forecasts
     
 ```{r}
+#7 day forecast
 plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,195), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "7 Day Increase in COVID Cases Forecast")
 lines(seq(188, 194,1), inpos.preds7$f, type = "l", col = "red")
+```
 
-plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,280), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "7 Day Increase in COVID Cases Forecast")
+```{r}
+#90 day forecast
+plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,280), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "90 Day Increase in COVID Cases Forecast")
 lines(seq(188, 277,1), inpos.preds90$f, type = "l", col = "red")
 ```
 
 
-#### Forecast Currently Hospitalized Patients depend on above variable forecasts
+#### Forecast Currently Hospitalized Patients using Positive Increase and Total Cases
 
+##### MLR w/ Correlated Errors w/ No Lagged Variables
 1. Fit simple regression model predicting *hospitalizedCurrently* with *positive*, *positiveIncrease* and a trend.
 
 ```{r} 
-us.mlr.fit = lm(hospitalizedCurrently~positiveIncrease,positive, date, data=us)
+us.mlr.fit = lm(hospitalizedCurrently~positiveIncrease+positive+date, data=us)
 summary(us.mlr.fit)
 ```
 
@@ -212,24 +221,27 @@ summary(us.mlr.fit)
     a. Below we can see that our aic.wge function has selected an AR(6) model for modeling our cmort information.
 
 ```{r}
-us.mlr.phi= aic.wge(us.mlr.fit$residuals, p = 0:8, q = 0:0)
+us.mlr.phi= aic.wge(us.mlr.fit$residuals, p = 0:12, q = 0:12)
 us.mlr.phi
 ```
 
 3. Now forcast with arima function with phi's from above coefficients and AR(6) model
 
 ```{r}
-us.mlr.model = arima(us$hospitalizedCurrently, order = c(us.mlr.phi$p,1,us.mlr.phi$q), seasonal = list(order = c(1,0,0), period = 7), xreg = cbind(us$positive, us$hospitalizedIncrease, us$date))
-us.mlr.model
-AIC(us.mlr.model)
+#us.mlr.modelfit = arima(us$hospitalizedCurrently, order = c(8,0,6), xreg = cbind(us$positive, us$hospitalizedIncrease, us$date))
+#AIC(us.mlr.modelfit)
+
+#fit = arima(CM$cmort,order = c(phi$p,0,phi$q), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CM$temp, CM$part, CM$Week))
+
+#AIC(fit) #3166
 ```
 
 4. Now we check the residuals for white noise from our above model
 
 ```{r}
-acf(us.mlr.model$residuals) #Visual ACF test
-us.mlr.wn.test = ljung.wge(us.mlr.model$residuals)
-us.mlr.wn.test$pval
+#acf(us.mlr.modelfit$residuals) #Visual ACF test
+#us.mlr.wn.test = ljung.wge(us.mlr.modelfit$residuals)
+#us.mlr.wn.test$pval
 ```
 
 #### With the inability to reject the N null for the white noise test for an MLR model w/ correlated errors we will have to settle on the model being white noise with a seasonal and (1-B) component.
@@ -237,30 +249,42 @@ us.mlr.wn.test$pval
 5. Load the forecasted positive and increase positive in a data frame
 
 ```{r}
-regressions7 = data.frame(positiveIncrease = inpos.preds7$f, positive = pos.preds7$f, date = seq(188,194,1))
-regressions7
-regressions90 = data.frame(positiveIncrease = inpos.preds90$f, positive = pos.preds90$f, date = seq(188,277,1))
-regressions90
+#7 forecast
+#regressions7 = data.frame(positiveIncrease = inpos.preds7$f, positive = pos.preds7$f, date = seq(188,194,1))
+```
+
+```{r}
+#90 forecast
+#regressions90 = data.frame(positiveIncrease = inpos.preds90$f, positive = pos.preds90$f, date = seq(188,277,1))
 ```
 
 6. Predictions
 
 ```{r}
-us7 = predict(us.mlr.model, newxreg = regressions7)
+#7 day predictions
+#us7 = predict(us.mlr.modelfit, newxreg = regressions7)
+```
 
-us90 = predict(us.mlr.model, newxreg = regressions90)
+```{r}
+#90 day predictions
+#us90 = predict(us.mlr.modelfit, newxreg = regressions90)
 ```
 
 7. Plotted Forecasts
 
 ```{r}
-plot(seq(1,187,1), us$hospitalizedCurrently, type = "l", xlim = c(0,195), ylim = c(0,3000000), ylab = "Currently Hospitalized COVID Cases", main = "7 Day Forecast for COVID Hospitalized Cases")
-lines(seq(188,194,1), us7$pred, type = "l", col = "red")
+#plot(seq(1,187,1), us$hospitalizedCurrently, type = "l", xlim = c(0,195), ylim = c(0,475000), ylab = "Currently Hospitalized COVID Cases", main = "7 Day Forecast for COVID Hospitalized Cases")
+#lines(seq(188,194,1), us7$pred, type = "l", col = "red")
 ```
 
 8. ASE
 
 ```{r}
+#usSmall = us[1:150,]
+#us.ksfit = lm(hospitalizedCurrently~positive+)
+
+
+#EXAMPLE CODE
 #Find ASE  Need to forecast last 30 of known series.  
 #CMsmall = CM[1:478,]
 #ksfit = lm(cmort~temp+part+Week, data = CMsmall)
@@ -280,7 +304,10 @@ lines(seq(188,194,1), us7$pred, type = "l", col = "red")
 #lines(seq(479,508,1), predsCMort$pred, type = "l", col = "red")
 ```
 
+9. Rolling Windowed ASE
 
+```{r}
+```
 
 
 #### VAR Model

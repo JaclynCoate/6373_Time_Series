@@ -17,12 +17,12 @@ library(ggthemes)
 ## Data Prep
 
 ```{r load data}
-us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily7.19.csv", header = T, strip.white = T)
+us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
 us <- transform(us, date = as.Date(as.character(date), "%Y%m%d"))
 us <- subset(us, select = -c(states, dateChecked, hospitalized, lastModified, total, posNeg, totalTestResultsIncrease, hash))
 us[is.na(us)] <- 0
 #Selecting only those dates with reported current hospitilizations
-us <- dplyr::slice(us,1:124)
+us <- dplyr::slice(us,1:132)
 us = us[order(as.Date(us$date, format = "%Y%m%d")),]
 head(us)
 ```
@@ -115,7 +115,7 @@ est.us.diff.seasBIC = est.arma.wge(us.diff.seas, p = 2)
 mean(us$hospitalizedCurrently)
 ```
 
-### Forecasts
+### Univariate Forecasts
 
 #### ARIMA(5,1,1), s=7
 ##### Short Term
@@ -163,6 +163,7 @@ ASE
 ```
 
 ##### Long Term
+
 ```{r}
 longARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = F, limits = F)
 ```
@@ -247,7 +248,6 @@ ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-
 ASE
 ```
 
-
 ##### Long Term
 ```{r}
 longAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, s= 7, d = 1, n.ahead = 90, lastn = FALSE, limits = FALSE)
@@ -294,3 +294,209 @@ fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi
 ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
 ASE
 ```
+
+
+#### MLR w/ Correlated Errors
+MLR w/ Correlated Errors
+    a. Fit a simple 
+
+```{r}
+us.lm.fit = lm(hospitalizedCurrently~date, data = us)
+us.lm.fit
+```
+    b. Diagnose a model using aic.wge: ARMA(2,1)
+
+```{r}
+us.fit.phi = aic.wge(us.lm.fit$residuals)
+us.fit.phi
+```
+    c. Fit an aruma model
+
+```{r}
+#without d and s
+us.fit.1 = arima(us$hospitalizedCurrently, order = c(us.fit.phi$p,0,us.fit.phi$q))
+us.fit.1
+AIC(us.fit.1)
+```
+    d. Checking for white noise: failure to to reject the H_null tells us the remainer of the data cannot be determined as any different than white noise.
+
+```{r}
+acf(us.fit.1$residuals)
+ljung.wge(us.fit.1$residuals) # pval = .1493
+```
+  e. Predictions
+
+```{r}
+us.preds7 = predict(us.fit.1, n.ahead = 7)
+us.preds7$pred
+us.preds90 = predict(us.fit.1, n.ahead = 90)
+us.preds90$pred
+```
+  f. Visualiztion of predictions
+
+```{r}
+#7 Day Forecast
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,140), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 7 Day Forecast")
+lines(seq(133, 139, 1), us.preds7$pred, type= "l", col = "red")
+```
+
+```{r}
+#90 Day Forecast
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,225), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 90 Day Forecast")
+lines(seq(133, 222, 1), us.preds90$pred, type= "l", col = "red")
+```
+
+
+
+
+```{r example code}
+# Model cmort based on predicted part and temp using MLR with Cor Erros
+#assuming data is loaded in dataframe CM
+#ksfit = lm(cmort~temp+part+Week, data = CM)
+#phi = aic.wge(ksfit$residuals) #AR(2)
+
+#fit = arima(CM$cmort,order = c(phi$p,0,phi$q), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CM$temp, CM$part, CM$Week))
+
+#AIC(fit) #3166
+
+# Check for whiteness of residuals
+#acf(fit$residuals)
+#ljung.wge(fit$residuals) # pval = .059
+#ljung.wge(fit$residuals, K = 48) # pval = .004
+
+#load the forecasted Part and Temp in a data frame
+#next20 = data.frame(temp = predsTemp$f, part = predsPart$f, Week = seq(509,528,1))
+#get predictions
+#predsCMort = predict(fit,newxreg = next20)
+#plot next 20 cmort wrt time
+#plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+#lines(seq(509,528,1), predsCMort$pred, type = "l", col = "red")
+
+
+
+
+#Find ASE  Need to forecast last 30 of known series.  
+#CMsmall = CM[1:478,]
+#ksfit = lm(cmort~temp+part+Week, data = CMsmall)
+#phi = aic.wge(ksfit$residuals)
+#fit = arima(CMsmall$cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CMsmall$temp, CMsmall$part, #CMsmall$Week))
+
+#AIC(fit) #2990.101
+
+#last30 = data.frame(temp = CM$temp[479:508], part = CM$part[479:508], CMWeek = seq(479,508,1))
+#get predictions
+#predsCMort = predict(fit,newxreg = last30)
+
+#ASE = mean((CM$cmort[479:508] - predsCMort$pred)^2)
+#ASE #84.2398
+
+#plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "Last 30 Week Cardiac Mortality Forecast")
+#lines(seq(479,508,1), predsCMort$pred, type = "l", col = "red")
+```
+
+
+
+
+
+
+
+#### RNN
+
+- Creating train / test data set
+
+```{r}
+library(nnfor)
+head(us)
+usTrain.nn = ts(us$hospitalizedCurrently[1:122])
+```
+
+- Fitting NN model on train data set w/ default settings
+
+```{r}
+us.nn.fit = mlp(usTrain.nn)
+plot(us.nn.fit)
+```
+
+- Forecast horizon/step forward 
+
+```{r}
+us.nn.fit.fore = forecast(us.nn.fit, h=10)
+plot(us.nn.fit.fore)
+```
+
+- Plot forecast against test set
+
+```{r}
+plot(us$hospitalizedCurrently[123:132], type = "l", ylim = c(55000, 80000))
+lines(seq(1:10), us.nn.fit.fore$mean, col = "blue")
+```
+
+- Calculate ASE
+
+```{r}
+ASEus.nn.fit.fore = mean((us$hospitalizedCurrently[123:132]-us.nn.fit.fore$mean)^2)
+ASEus.nn.fit.fore
+```
+
+- Rolling Windowed ASE
+
+- Windowed ASE
+```{r, fig.show="hide", warning=FALSE}
+#phis = est.us.diff.seasBIC$phi
+#thetas = est.us.diff.seasBIC$theta
+
+#trainingSize = 24
+#horizon = 90
+#ASEHolder = numeric()
+
+#for( i in 1:(124-(trainingSize + horizon) + 1))
+#{
+#  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
+  
+#  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - longAR$f)^2)
+         
+#  ASEHolder[i] = ASE
+#}
+```
+
+```{r}
+#ASEHolder
+#hist(ASEHolder)
+#WindowedASE = mean(ASEHolder)
+```
+
+```{r}
+#summary(ASEHolder)
+#WindowedASE
+```
+
+```{r}
+#fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = 90, lastn = TRUE)
+#ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
+#ASE
+```
+
+
+#### Ensemble Model
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+
+
+
