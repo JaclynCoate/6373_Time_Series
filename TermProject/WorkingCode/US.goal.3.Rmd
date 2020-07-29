@@ -226,7 +226,7 @@ us.mlr.phi
 ```
 
 3. Now forcast with arima function with phi's from above coefficients and AR(6) model
-
+#Error, can't seem to figure out what's going on
 ```{r}
 #us.mlr.modelfit = arima(us$hospitalizedCurrently, order = c(8,0,6), xreg = cbind(us$positive, us$hospitalizedIncrease, us$date))
 #AIC(us.mlr.modelfit)
@@ -307,41 +307,78 @@ us.mlr.phi
 9. Rolling Windowed ASE
 
 ```{r}
-```
 
+```
 
 #### VAR Model
+Since we are working with a seasonal and transformation component but it requires an additional transformation for the total positive COVID cases to become stationary for evaluation, we will only use positive increase of cases to predict currently hospitzliaed cases for the VAR model.
 
-1. Creating train / test data 
+1. Differenced and Seasonal Transformation VAR Model
 
 ```{r}
-library(vars)
-usTrain.var = us[1:122,]
-usTrain.var
+#Positive Cases Transformations
+#pos.diff = artrans.wge(us$positive, phi.tr = 1, lag.max = 100)
+#pos.diff.2 = artrans.wge(pos.diff, phi.tr = 1, lag.max = 100)
+#pos.trans = artrans.wge(pos.diff.2,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+#Increase Positive Transformation
+inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
+inpos.trans = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+#Current Hospitalization Transformations
+us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
+currhosp.trans = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
 ```
 
-2. Fit VAR mode
+2. Use Var select to find best model and fit model: p = 8 for lowest AIC
 
 ```{r}
-us.var.fit = VAR(cbind(usTrain.var$hospitalizedCurrently, usTrain.var$positive, usTrain.var$positiveIncrease), lag.max = 14, type = "both")
+#VARselect to choose lag
+VARselect(cbind(currhosp.trans, inpos.trans), lag.max = 10, type= "both")
+#fit model
+usdiff.var.fit = VAR(cbind(currhosp.trans, inpos.trans), type = "both", p = 2)
 ```
 
-3. Predictions
+3. Predictions for Difference
 
 ```{r}
-pred.var = predict(us.var.fit, n.ahead = 10)
+#7 day predictions
+pred.var7 = predict(usdiff.var.fit, n.ahead = 7)
+pred.var7
 ```
 
-4. Plot predictions / actual
+```{r}
+#90 day predictions
+pred.var90 = predict(usdiff.var.fit, n.ahead = 90)
+pred.var90
+```
+
+4. Calculate Actual Forecasts from Predicted Differences
+```{r}
+startingPoints7 = us$hospitalizedCurrently[181:187]
+currHospForecasts7 = pred.var7$fcst$currhosp.trans[,1:3] + startingPoints7
+```
 
 ```{r}
-plot(us$hospitalizedCurrently, type = "l")
-lines(seq(123,132,1),pred.var$fcst$y1[,1],col="red")
+startingPoints90 = us$hospitalizedCurrently[98:187]
+currHospForecasts90 = pred.var90$fcst$currhosp.trans[,1:3] +startingPoints90
+```
+
+5. Plotting Forecasts
+
+```{r}
+#7 day Forecasts
+plot(seq(1,187,1), us$hospitalizedCurrently, type = "l", xlim = c(0,195), ylab = "Currently Hospitalized COVID Patients", main = "7 Day Currently Hospitalized Patients Forecast")
+lines(seq(188,194,1), as.data.frame(currHospForecasts7)$fcst, type = "l", col = "red")
+```
+
+```{r}
+#90 day Forecasts
+plot(seq(1,187,1), us$hospitalizedCurrently, type = "l", xlim = c(0,280), ylab = "Currently Hospitalized COVID Patients", main = "90 Day Currently Hospitalized Patients Forecast")
+lines(seq(188,277,1), as.data.frame(currHospForecasts90)$fcst, type = "l", col = "red")
 ```
 
 5. Calculate ASE
-
+# *WHERE YOU LEFT OFF*
 ```{r}
-varASE = mean((us$hospitalizedCurrently[123:132]-pred.var$fcst$y1[1:10])^2)
-varASE
+#varASE = mean((us$hospitalizedCurrently[123:132]-pred.var$fcst$y1[1:10])^2)
+#varASE
 ```
