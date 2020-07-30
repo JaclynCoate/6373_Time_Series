@@ -449,4 +449,58 @@ ASEus.nn.fit.fore
 ```
 
 - Windowed ASE
+```{r}
+library(tswgewrapped)
+```
 
+```{r}
+data_train.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:122], positiveIncrease = rnorm(122, 0, .0001))
+data_test.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[123:132], positiveIncrease = rnorm(10, 0, .0001))
+```
+
+```{r}
+# search for best NN hyperparameters in given grid
+model.u = tswgewrapped::ModelBuildNNforCaret$new(data = data_train.u, var_interest = "hospitalizedCurrently",
+                                               search = 'random', tuneLength = 5, parallel = TRUE,
+                                               batch_size = 50, h = 7, m = 7,
+                                               verbose = 1)
+```
+
+  - The ASEs associated with the grid of hyperparameters is shown in the table and heatmap below.
+
+```{r}
+res.u <- model.u$summarize_hyperparam_results()
+res.u
+```
+
+```{r}
+model.u$plot_hyperparam_results()
+```
+
+  - Windowed ASE: The best hyperparemeters are shown below
+
+```{r}
+best.u <- model.u$summarize_best_hyperparams()
+best.u
+```
+
+```{r}
+final.ase.u <- dplyr::filter(res.u, reps == best.u$reps &
+                    hd == best.u$hd &
+                    allow.det.season == best.u$allow.det.season)[['ASE']]
+final.ase.u
+```
+
+  - The best hyperparameters based on this grid search are 13 repetitions and 1 hidden layers, and allow.det.season = FALSE which has a mean windowed ASE.
+
+```{r}
+# Final Model
+caret_model.u = model.u$get_final_models(subset = 'a')
+caret_model.u$finalModel
+```
+
+  - Plot final model
+```{r}
+#Plot Final Model
+plot(caret_model.u$finalModel)
+```

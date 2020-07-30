@@ -516,7 +516,7 @@ final.ase.m <- dplyr::filter(res.m, reps == best.m$reps &
 final.ase.m
 ```
 
-  - The best hyperparameters based on this grid search are 13 repetitions and 1 hidden layers, and allow.det.season = FALSE which has a mean rolling window ASE of 5.4964555.
+  - The best hyperparameters based on this grid search are 13 repetitions and 1 hidden layers, and allow.det.season = FALSE which has a mean windowed ASE.
 
 ```{r}
 # Final Model
