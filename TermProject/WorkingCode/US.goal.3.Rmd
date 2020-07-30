@@ -347,38 +347,39 @@ usdiff.var.fit = VAR(cbind(currhosp.trans, inpos.trans), type = "both", p = 2)
 ```
 
 3. Predictions for Difference
-
+    a. 7 Day
 ```{r}
 #7 day predictions
 pred.var7 = predict(usdiff.var.fit, n.ahead = 7)
-pred.var7
+pred.var7$fcst$currhosp.trans
 ```
-
+    b. 90 Day
 ```{r}
 #90 day predictions
 pred.var90 = predict(usdiff.var.fit, n.ahead = 90)
-pred.var90
+pred.var90$fcst$currhosp.trans
 ```
 
 4. Calculate Actual Forecasts from Predicted Differences
+    a. 7 Day
 ```{r}
 startingPoints7 = us$hospitalizedCurrently[126:132]
 currHospForecasts7 = pred.var7$fcst$currhosp.trans[,1:3] + startingPoints7
 ```
-
+    b. 90 Day
 ```{r}
 startingPoints90 = us$hospitalizedCurrently[43:132]
 currHospForecasts90 = pred.var90$fcst$currhosp.trans[,1:3] + startingPoints90
 ```
 
 5. Plotting Forecasts
-
+    a. 7 Day
 ```{r}
 #7 day Forecasts
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,139), ylab = "Currently Hospitalized COVID Patients", main = "7 Day Currently Hospitalized Patients Forecast")
 lines(seq(133,139,1), as.data.frame(currHospForecasts7)$fcst, type = "l", col = "red")
 ```
-
+    b. 90 Day
 ```{r}
 #90 day Forecasts
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,222), ylab = "Currently Hospitalized COVID Patients", main = "90 Day Currently Hospitalized Patients Forecast")
@@ -400,74 +401,77 @@ lines(seq(133,222,1), as.data.frame(currHospForecasts90)$fcst, type = "l", col =
 
 #### Multilayer Perceptron Model (MLP) / NN
 Since we have been looking at additional regressors for all our above models and know that the best regressor to leverage will be positive increase of COVID cases. This regressor reflects similar behavior to that of current hospitlizations and can be model properly against hospitalizations.
-1. Train data set
+1. Create Current Hospitalized ts variable
 
 ```{r}
-currhosp.train = ts(us$hospitalizedCurrently[1:125])
+tUScurrhop = ts(us$hospitalizedCurrently)
 ```
 
-2. Create data frame of regressors
+2. Create data frame of regressor: positive increase covid cases variable
 
 ```{r}
-incposreg = data.frame(increase = ts(us$positiveIncrease))
-incposreg
+tUSx = data.frame(positiveIncrease = ts(us$positiveIncrease))
 ```
 
-3. Fit a multilayer perceptron model (nn) w/ Increase Positive Cases Regressor
+3. Forecast of positive increase of COVID cases
+    a. 7 Day Forecast for Regressor
 
 ```{r}
-currhosp.default.fit = mlp(currhosp.train, xreg = incposreg)
-plot(currhosp.default.fit)
+fit.mlp.new = mlp(ts(tUSx), reps = 50, comb = "mean")
+mlp.new.fore7 = forecast(fit.mlp.new, h = 7)
+mlp.new.fore7
 ```
-
-4. Forecast w/ test data set
+    b. 90 Day Forecast for Regressor
 
 ```{r}
-currhosp.reg.fore = forecast(currhosp.default.fit, h = 7, xreg = incposreg)
-plot(currhosp.reg.fore)
+mlp.new.fore90 = forecast(fit.mlp.new, h = 90)
+mlp.new.fore90
 ```
 
-5. Plot Observed v Forecasted
+4. Combine observed new cases + forecast new cases
+    a. 7 Day regressor var
 
 ```{r}
-plot(us$hospitalizedCurrently[126:132], type = "l", ylim = c(58000,63000))
-lines(seq(1:7), currhosp.reg.fore$mean, col = "blue")
+new.regressor7 <- data.frame(c(us$positiveIncrease, mlp.new.fore7$mean))
+new.regressor7 
 ```
-
-6. ASEs
+    b. 90 day regressor var
 
 ```{r}
-ASE.default.mlp = mean((us$hospitalizedCurrently[126:132]-currhosp.reg.fore$mean)^2)
-ASE.default.mlp
+new.regressor90 <- data.frame(c(us$positiveIncrease, mlp.new.fore90$mean))
+new.regressor90
 ```
 
-7. Default Forecasts
-  a. 7 Day Forecast Model
-# Error
-```{r}
-#currhosp.mlp = mlp(ts(us$hospitalizedCurrently), comb = "mean", xreg = incposreg)
-#currhosp.mlp
-#plot(currhosp.mlp)
-
-#currhosp.forecast7 = forecast(currhosp.mlp, h=7, xreg = incposreg)
-#plot(currhosp.forecast7)
-
-#fit.mlp = mlp(ts(SM$Melanoma),reps = 50,comb = "mean",xreg = SM)
-#fit.mlp
-#plot(fit.mlp)
-#SMDF = data.frame(Sunspot = ts(c(SM$Sunspot,SMsmallDF_fore$Sunspot)))
-#fore.mlp = forecast(fit.mlp, h = 8, xreg = SMDF)
-#plot(fore.mlp)
-```
-
-  b. 90 Day Forecast Model
-# Error
+5. Fit model for currently hospitalized w/ regressor of new cases
 
 ```{r}
-#currhosp.forecast90 = forecast(currhosp.fit.default, h = 90, xreg = incposreg)
-#plot(currhosp.forecast90)
+mlp.fit1 = mlp(tUScurrhop, xreg = tUSx, outplot = T, comb = "mean")
+plot(mlp.fit1)
 ```
 
+4. Forecast w/ known Positive Increase Case Variable
+    a. Currently Hospitalized 7 Day Forecast w/ Positive Increaser Regressor
+
+```{r}
+currhosp.fore7 = forecast(mlp.fit1, h = 7, xreg = new.regressor7)
+plot(currhosp.fore7)
+```
+    b. Currently Hospitalized 90 Day Forecast w/ Positive Increaser Regressor
+
+```{r}
+currhosp.fore90 = forecast(mlp.fit1, h = 90, xreg = new.regressor90)
+plot(currhosp.fore90)
+currhosp.fore90$mean
+```
+
+5. ASEs
+#WHERE YOU LEFT OFF
+```{r}
+
+
+#ASE = mean((BS$sales[81:100]-f$mean)^2)
+#ASE
+```
 
 #### Ensemble Model
 
