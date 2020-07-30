@@ -1,0 +1,489 @@
+---
+title: "Goal 3 Multivariate: US"
+author: "Jaclyn A Coate"
+date: "7/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(ggthemes)
+library(vars)
+library(nnfor)
+library(tswge)
+```
+
+# US COVID Data
+
+## Data Prep
+
+```{r load data}
+us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
+us <- transform(us, date = as.Date(as.character(date), "%Y%m%d"))
+us <- subset(us, select = -c(states, dateChecked, hospitalized, lastModified, total, posNeg, totalTestResultsIncrease, hash))
+us[is.na(us)] <- 0
+us = us[order(as.Date(us$date, format = "%Y%m%d")),]
+head(us)
+```
+
+### Current Hospitalization Realization
+Traits:
+
+- Heavy wandering behavior 
+- What appears to be some noise that could be pseudo-cyclic behavior hidden by the large numbers.
+
+```{r}
+ggplot(data = us, aes(x=date, y=hospitalizedCurrently))+
+  geom_line(color="orange")+
+  labs(title = "Current COVID Hospitalized Cases US", y = "Thousands", x = "") +
+    theme_fivethirtyeight()
+```
+
+## Stationarity
+
+It is difficult to assume stationarity for this data due to multiple factors. We are working under the assumption that COVID is a novel virus and cases as well as hospitalizations will eventually return to zero. This being said our current modeling techniques do things such as return to the median or mimic the previously seen trends. Also, we see a heavy wandering trend in both new cases and hospitalization would be dependent on this as well as time. We will review the data and see what, if any, non-stationary components reveal themselves and model the data accordingly.
+
+## Forecast Current Hospitalizations
+It is difficult to assume stationarity for this data due to multiple factors. We are working under the assumption that COVID is a novel virus and cases as well as hospitalizations will eventually return to zero. This being said our current modeling techniques do things such as return to the median or mimic the previously seen trends. Also, we see a heavy wandering trend in both new cases and hospitalization would be dependent on this as well as time. We will review the data and see what, if any, non-stationary components reveal themselves and model the data accordingly.
+
+## Variable Review
+
+When reviewing the variables and the scatter plot from our previous EDA we can see that there are some correlations that were expected, for example *currentHospitalizations* is correlated with the variables that refelct ICU and Ventilaor patients. These metrics wouldn't exist without hospitalizations. These variables also cannot help up predict hospitalizations because they after occurances. So we will actually be leveraing variables such as *positive* and *positive increase* in order to see if there is some sort of correlation between hospitalized patients and the number of positive cases.
+
+- Positive Tests Trend
+
+```{r}
+ggplot(data = us, aes(x=date, y=positive))+
+  geom_line(color="orange")+
+  labs(title = "Total Cases US", y = "Millions", x = "") +
+    theme_fivethirtyeight()
+```
+
+- Positive Increase Trend
+
+```{r}
+ggplot(data = us, aes(x=date, y=positiveIncrease))+
+  geom_line(color="orange")+
+  labs(title = "Increase in COVID Cases US", y = "Thousands", x = "") +
+    theme_fivethirtyeight()
+```
+
+### MLR w/ Correlated Errors for Currently Hospitalized Patients
+#### Forecast Independent Variables
+1. Forecast Increase Positive Cases
+    a. Evaluation: Slowly dampening ACF and heavy wandering consistent with a (1-B) factor. As well as frequency peaks at 0 and .14. Consistent with (1-B) and seasonailty component of 7.
+
+```{r}
+#a
+plotts.sample.wge(us$positiveIncrease)
+```
+    b. Differencing Data: much more stationary data and have surfaced a seasonaly component = 7 seen on ACF peaks at 7, 14, 21
+
+```{r}
+#b
+inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
+```
+    c. Seaonality Transformation: stationary data, and an ACF that reflects data other than whitenoise to be modeled.
+    
+```{r}
+#c
+inpos.diff.seas = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+```
+    d. Model IDing: diagnose with aic.wge to determine phi, thetas: Both AIC/BIC select ARMA(4,2)
+
+```{r}
+#d
+aic5.wge(inpos.diff.seas)
+aic5.wge(inpos.diff.seas, type = "bic")
+```
+    e. White Noise Test: Reject the H_null and accept this data is not white noise
+    
+```{r}
+#e
+acf(inpos.diff.seas)
+ljung.wge(inpos.diff.seas)$pval
+```
+    f. Estiamte Phis, Thetas
+    g. Model Building
+
+```{r}
+#f
+est.inpos.seas = est.arma.wge(inpos.diff.seas, p = 4, q = 2)
+mean(us$positiveIncrease)
+#g
+```
+    h. Forecast 7/90 Days 
+    
+```{r}
+#7 day
+inpos.preds7 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, theta = est.inpos.seas$theta, d=1, s=7, n.ahead = 7)
+```
+
+```{r}
+#90 day
+inpos.preds90 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, theta = est.inpos.seas$theta, d=1, s=7, n.ahead = 90)
+```
+    i. Plotting forecasts
+    
+```{r}
+#7 day forecast
+plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,195), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "7 Day Increase in COVID Cases Forecast")
+lines(seq(188, 194,1), inpos.preds7$f, type = "l", col = "red")
+```
+
+```{r}
+#90 day forecast
+plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,280), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "90 Day Increase in COVID Cases Forecast")
+lines(seq(188, 277,1), inpos.preds90$f, type = "l", col = "red")
+```
+
+#### Forecast Currently Hospitalized Patients using Positive Increase and Total Cases
+1. Data prep and recognizing differencing and seaonal components of Currently Hospitalized
+
+```{r}
+#Selecting only those dates with reported current hospitilizations
+us <- dplyr::slice(us,56:187)
+invisible(us)
+```
+
+```{r}
+#Stationarize Currently Hospitalized Variable
+us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
+acf(us.diff)
+us.diff.seas = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+acf(us.diff.seas)
+#Stationarize Increase Positive Variable
+inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
+acf(inpos.diff)
+inpos.diff.seas = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+acf(inpos.diff.seas)
+```
+
+2. Fit simple regression model predicting *hospitalizedCurrently* with *positiveIncrease*.
+
+```{r}
+mlr.fit = lm(us.diff.seas~inpos.diff.seas, data=cbind(data.frame(us.diff.seas), data.frame(inpos.diff.seas)))
+summary(mlr.fit)
+AIC(mlr.fit)
+acf(mlr.fit$residuals)
+plot(mlr.fit$residuals)
+```
+
+3. Diagnose with aic.wge and see what the p, q would be with residuals from above model
+    a. Below we can see that our aic.wge function has selected an ARMA(1,2) model for modeling our cmort information.
+
+```{r}
+mlr.phis= aic.wge(mlr.fit$residuals)
+mlr.phis
+```
+
+4. Now forcast with arima function with phi's from above coefficients and ARMA(1,2) model, 
+
+```{r}
+mlr.fit.arima = arima(us$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = us$positiveIncrease)
+AIC(mlr.fit.arima)
+```
+
+5. Run test to see if data is white noise: confirmed white noise, continue forward
+
+```{r}
+acf(mlr.fit.arima$resid) 
+ltest1 = ljung.wge(mlr.fit.arima$resid) 
+ltest1$pval
+ltest2 = ljung.wge(mlr.fit.arima$resid, K= 48)
+ltest2$pval
+```
+
+6. Load the forecasted increase positive in a data frame
+    a. 7 Day
+```{r}
+#7 Day Case Increase
+regs7 = data.frame(positiveIncrease = inpos.preds7$f)
+invisible(regs7)
+```
+    b. 90 Day
+```{r}
+#90 Day Case Increase
+regs90 = data.frame(positiveIncrease = inpos.preds90$f)
+invisible(regs90)
+```
+
+7. Predictions
+    a. 7 Day
+```{r}
+mlr1.preds7 = predict(mlr.fit.arima, newxreg = regs7, n.ahead = 7)
+invisible(mlr1.preds7)
+```
+    b. 90 Day
+```{r}
+mlr1.preds90 = predict(mlr.fit.arima, newxreg = regs90, n.ahead =90)
+invisible(mlr1.preds90)
+```
+
+8. Plotted Forecasts
+    a. 7 Day
+```{r}
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l",  xlim = c(0,140), ylim = c(0,60000), ylab = "Currently Hospitalized COVID Cases", main = "7 Day Forecast for COVID Hospitalized Cases")
+lines(seq(133,139,1), mlr1.preds7$pred, type = "l", col = "red")
+```
+    b. 90 Day
+```{r}
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l",  xlim = c(0,223), ylim = c(0,60000), ylab = "Currently Hospitalized COVID Cases", main = "90 Day Forecast for COVID Hospitalized Cases")
+lines(seq(133,222,1), mlr1.preds90$pred, type = "l", col = "red")
+```
+
+9. Windowed ASE
+
+#### MLR w/ Correlated Errors for Currently Hospitalized Patients w/ Trend
+
+1. Fit simple regression model predicting *hospitalizedCurrently* with *positiveIncrease* and trend
+
+```{r}
+time <- seq(1,124,1)
+mlr.fit.t = lm(us.diff.seas~inpos.diff.seas+time, data=cbind(data.frame(us.diff.seas), data.frame(inpos.diff.seas)))
+summary(mlr.fit.t)
+AIC(mlr.fit.t)
+acf(mlr.fit.t$residuals)
+plot(mlr.fit.t$residuals)
+```
+
+3. Diagnose with aic.wge and see what the p, q would be with residuals from above model
+    a. Below we can see that our aic.wge function has selected an ARMA(1,2) model for modeling our cmort information.
+
+```{r}
+mlr.phis= aic.wge(mlr.fit.t$residuals)
+mlr.phis
+```
+
+4. Now forcast with arima function with phi's from above coefficients and ARMA(1,2) model, 
+
+```{r}
+Time <- seq(1,132,1)
+mlr.fit.arima.t = arima(us$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = cbind(us$positiveIncrease, Time))
+AIC(mlr.fit.arima.t)
+```
+
+5. Run test to see if data is white noise; confirmed white noise continue forward.
+
+```{r}
+acf(mlr.fit.arima.t$resid) 
+ltest1 = ljung.wge(mlr.fit.arima.t$resid) 
+ltest1$pval
+ltest2 = ljung.wge(mlr.fit.arima.t$resid, K= 48)
+ltest2$pval
+```
+
+6. Load the forecasted increase positive in a data frame
+    a. 7 Day
+```{r}
+#7 Day Case Increase
+regs7t = data.frame(cbind(positiveIncrease = inpos.preds7$f, Time = seq(133,139)))
+invisible(regs7)
+```
+    b. 90 Day
+```{r}
+#90 Day Case Increase
+regs90t = data.frame(cbind(positiveIncrease = inpos.preds90$f, Time = seq(133,222)))
+invisible(regs90)
+```
+
+7. Predictions
+    a. 7 Day
+```{r}
+mlr1.preds7.t = predict(mlr.fit.arima.t, newxreg = regs7t, n.ahead = 7)
+invisible(mlr1.preds7.t)
+```
+    b. 90 Day
+```{r}
+mlr1.preds90.t = predict(mlr.fit.arima.t, newxreg = regs90t, n.ahead =90)
+invisible(mlr1.preds90.t)
+```
+
+8. Plotted Forecasts
+    a. 7 Day
+```{r}
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l",  xlim = c(0,140), ylim = c(0,60000), ylab = "Currently Hospitalized COVID Cases", main = "7 Day Forecast for COVID Hospitalized Cases")
+lines(seq(133,139,1), mlr1.preds7.t$pred, type = "l", col = "red")
+```
+    b. 90 Day
+```{r}
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l",  xlim = c(0,223), ylim = c(0,85000), ylab = "Currently Hospitalized COVID Cases", main = "90 Day Forecast for COVID Hospitalized Cases")
+lines(seq(133,222,1), mlr1.preds90.t$pred, type = "l", col = "red")
+```
+
+#### MLR w/ Correlated Errors (lagged variables) for Currently Hospitalized Patients
+With a quick check, we can see that there is no lag correlationed between the increase of COVID patients and hospitalized patients, like we theorized there might be. So we will not model an MLR w/ correlated errors on lagged variables.
+
+```{r}
+ccf(us$positiveIncrease,us$hospitalizedCurrently)
+```
+
+#### VAR Model
+Since we are working with a seasonal and transformation component but it requires an additional transformation for the total positive COVID cases to become stationary for evaluation, we will only use positive increase of cases to predict currently hospitzliaed cases for the VAR model.
+
+1. Differenced and Seasonal Transformation VAR Model
+
+```{r}
+#Positive Cases Transformations
+#pos.diff = artrans.wge(us$positive, phi.tr = 1, lag.max = 100)
+#pos.diff.2 = artrans.wge(pos.diff, phi.tr = 1, lag.max = 100)
+#pos.trans = artrans.wge(pos.diff.2,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+#Increase Positive Transformation
+inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
+inpos.trans = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+#Current Hospitalization Transformations
+us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
+currhosp.trans = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+```
+
+2. Use Var select to find best model and fit model: p = 8 for lowest AIC
+
+```{r}
+#VARselect to choose lag
+VARselect(cbind(currhosp.trans, inpos.trans), lag.max = 10, type= "both")
+#fit model
+usdiff.var.fit = VAR(cbind(currhosp.trans, inpos.trans), type = "both", p = 2)
+```
+
+3. Predictions for Difference
+
+```{r}
+#7 day predictions
+pred.var7 = predict(usdiff.var.fit, n.ahead = 7)
+pred.var7
+```
+
+```{r}
+#90 day predictions
+pred.var90 = predict(usdiff.var.fit, n.ahead = 90)
+pred.var90
+```
+
+4. Calculate Actual Forecasts from Predicted Differences
+```{r}
+startingPoints7 = us$hospitalizedCurrently[126:132]
+currHospForecasts7 = pred.var7$fcst$currhosp.trans[,1:3] + startingPoints7
+```
+
+```{r}
+startingPoints90 = us$hospitalizedCurrently[43:132]
+currHospForecasts90 = pred.var90$fcst$currhosp.trans[,1:3] + startingPoints90
+```
+
+5. Plotting Forecasts
+
+```{r}
+#7 day Forecasts
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,139), ylab = "Currently Hospitalized COVID Patients", main = "7 Day Currently Hospitalized Patients Forecast")
+lines(seq(133,139,1), as.data.frame(currHospForecasts7)$fcst, type = "l", col = "red")
+```
+
+```{r}
+#90 day Forecasts
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,222), ylab = "Currently Hospitalized COVID Patients", main = "90 Day Currently Hospitalized Patients Forecast")
+lines(seq(133,222,1), as.data.frame(currHospForecasts90)$fcst, type = "l", col = "red")
+```
+
+5. Calculate ASE
+# *WHERE YOU LEFT OFF*
+```{r}
+#varASE = mean((us$hospitalizedCurrently[123:132]-pred.var$fcst$y1[1:10])^2)
+#varASE
+```
+
+6. Windowed ASE
+
+```{r}
+
+```
+
+#### Multilayer Perceptron Model (MLP) / NN
+Since we have been looking at additional regressors for all our above models and know that the best regressor to leverage will be positive increase of COVID cases. This regressor reflects similar behavior to that of current hospitlizations and can be model properly against hospitalizations.
+1. Train data set
+
+```{r}
+currhosp.train = ts(us$hospitalizedCurrently[1:125])
+```
+
+2. Create data frame of regressors
+
+```{r}
+incposreg = data.frame(increase = ts(us$positiveIncrease))
+incposreg
+```
+
+3. Fit a multilayer perceptron model (nn) w/ Increase Positive Cases Regressor
+
+```{r}
+currhosp.default.fit = mlp(currhosp.train, xreg = incposreg)
+plot(currhosp.default.fit)
+```
+
+4. Forecast w/ test data set
+
+```{r}
+currhosp.reg.fore = forecast(currhosp.default.fit, h = 7, xreg = incposreg)
+plot(currhosp.reg.fore)
+```
+
+5. Plot Observed v Forecasted
+
+```{r}
+plot(us$hospitalizedCurrently[126:132], type = "l", ylim = c(58000,63000))
+lines(seq(1:7), currhosp.reg.fore$mean, col = "blue")
+```
+
+6. ASEs
+
+```{r}
+ASE.default.mlp = mean((us$hospitalizedCurrently[126:132]-currhosp.reg.fore$mean)^2)
+ASE.default.mlp
+```
+
+7. Default Forecasts
+  a. 7 Day Forecast Model
+# Error
+```{r}
+#currhosp.mlp = mlp(ts(us$hospitalizedCurrently), comb = "mean", xreg = incposreg)
+#currhosp.mlp
+#plot(currhosp.mlp)
+
+#currhosp.forecast7 = forecast(currhosp.mlp, h=7, xreg = incposreg)
+#plot(currhosp.forecast7)
+
+#fit.mlp = mlp(ts(SM$Melanoma),reps = 50,comb = "mean",xreg = SM)
+#fit.mlp
+#plot(fit.mlp)
+#SMDF = data.frame(Sunspot = ts(c(SM$Sunspot,SMsmallDF_fore$Sunspot)))
+#fore.mlp = forecast(fit.mlp, h = 8, xreg = SMDF)
+#plot(fore.mlp)
+```
+
+  b. 90 Day Forecast Model
+# Error
+
+```{r}
+#currhosp.forecast90 = forecast(currhosp.fit.default, h = 90, xreg = incposreg)
+#plot(currhosp.forecast90)
+```
+
+
+#### Ensemble Model
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+
