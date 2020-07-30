@@ -1,0 +1,128 @@
+---
+title: "CA-mlr"
+author: "jeysenbach"
+date: "7/30/2020"
+output: html_document
+---
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tswge)
+library(ggthemes)
+library(nnfor)
+library(zoo)
+library(vars)
+```
+
+```{r, message=FALSE}
+#Import Data obtained from ca.gov
+CA <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/CA_COVID_7.16.20.csv", header = T)
+#Re-format Date
+CA$date <- as.Date(CA$date, format = "%m/%d/%Y")
+head(CA)
+
+Totalhosp <- (CA$hospitalized_covid_confirmed_patients + CA$hospitalized_suspected_covid_patients)
+```
+
+Since we are predicting Hospitalizations, which we determined has no notable seasonality in the CA data, the number of new cases could be transformed into a more useful predictor by calculating the average of the past 7 days.
+
+```{r}
+
+newcases_7dayavg <- zoo::rollmean(CA$newcountconfirmed, k=7, align = "right")
+CA$newcases_7dayavg <- c(CA$newcountconfirmed[1:6],newcases_7dayavg)
+
+#Replot - Avg of last 7 days New Confirmed Cases
+ggplot(data=CA, aes(x=date, y=CA$newcases_7dayavg, group=1)) + 
+  geom_line(color="gold2") + ggtitle("Last 7 Day Avg Confirmed COVID-19 Cases in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count") +           theme_fivethirtyeight()
+```
+
+The MLR with correlated errors model is calculated using the smoothed version of the new cases data. We first need to forecast new cases, so that we can include them in our prediction of the hospitalizations forecast.
+
+```{r}
+#Cut out the zeros at the beginning of Totalhosp and create equal length variable for new cases that lines up with hospital data
+Totalhosp1 <- Totalhosp[12:119]
+newcases_7dayavg1 <- CA$newcases_7dayavg[5:112]
+```
+
+I used this mlp forecast of new cases for the forecast of hospitalizations
+
+```{r}
+newcases_7dayavg2 <- newcases_7dayavg[83:108]
+
+newcases_7dayavg2_ts <- ts(newcases_7dayavg2) #create time series object
+fit_mlp_cases = mlp(newcases_7dayavg2_ts, reps = 50, comb = "mean") #mlp fit
+fit_mlp_cases
+fore_mlp_cases <- forecast(fit_mlp_cases, h=7) #univariate 1-week mlp forecast
+plot(fore_mlp_cases)
+```
+
+
+The next step is to generate the MLR model that predicts hospitalizations.
+
+### MODEL EXCLUDING TIME
+
+```{r}
+#Check for lag between hospitalizations and new cases
+ccf(newcases_7dayavg1, Totalhosp1) #no lagging needed based on ccf plot
+
+#fit linear model for predicting hospitalization
+mlr_fit <- lm(Totalhosp1~newcases_7dayavg1)
+plot(mlr_fit$residuals)
+#fit residuals
+aic5.wge(mlr_fit$residuals) 
+#low p/q models as expected. The top pick of ARMA(1,1) should be reasonable
+fit1 = arima(Totalhosp1, order=c(1,0,1), xreg=newcases_7dayavg1)
+fit1 #aic = 1436
+
+#check residuals of model
+plot(fit1$residuals)
+acf(fit1$residuals) #appears to have no autocorrelation
+lj24 <- ljung.wge(fit1$residuals, p=1, q=1)
+lj24$pval
+lj48 <- ljung.wge(fit1$residuals, p=1, q=1, K=48)
+lj48$pval
+#Ljung-Box test fails to reject H0 - no evidence against white noise
+
+#forecast hospitalizations using prior forecast of 7 day avg new cases by mlp model
+next7 = data.frame(new_cases_avg = fore_mlp_cases$mean)
+f_mlr <- predict(fit1, newxreg = next7, n.ahead = 7)
+
+plot(seq(1,108,1), Totalhosp1, type = "l",xlim = c(0,115),ylim=c(4000,9000), xlab="days", ylab = "COVID-Related Hospitalized Patients", main = "7 Day Forecast - Linear Regression with Corr Errors Model")
+lines(seq(109,115,1), f_mlr$pred, type = "l", col = "red")
+```
+
+
+
+### MODEL INCLUDING TIME
+
+```{r}
+#fit linear model for predicting hospitalization, including time as a variable
+Time <- seq(1,108,1)
+tmlr_fit <- lm(Totalhosp1~newcases_7dayavg1+Time)
+plot(tmlr_fit$residuals)
+#fit residuals
+aic5.wge(tmlr_fit$residuals) 
+#The top pick is ARMA(1,1) again
+fit1t = arima(Totalhosp1, order=c(1,0,1), xreg=cbind(newcases_7dayavg1,Time))
+fit1t #aic =1433, slightly better with time included
+
+#check residuals of model
+plot(fit1t$residuals)
+acf(fit1t$residuals) #appears to have no autocorrelation
+lj24 <- ljung.wge(fit1t$residuals, p=1, q=1)
+lj24$pval
+lj48 <- ljung.wge(fit1t$residuals, p=1, q=1, K=48)
+lj48$pval
+#Ljung-Box test fails to reject H0 - no evidence against white noise
+
+#forecast hospitalizations using prior forecast of 7 day avg new cases by mlp model
+next7 = data.frame(new_cases_avg = fore_mlp_cases$mean, Time = seq(109,115,1))
+f_mlr <- predict(fit1t, newxreg = next7, n.ahead = 7)
+
+plot(seq(1,108,1), Totalhosp1, type = "l",xlim = c(0,115),ylim=c(4000,9000), xlab="days", ylab = "COVID-Related Hospitalized Patients", main = "7 Day Forecast - Linear Regression with Corr Errors Model")
+lines(seq(109,115,1), f_mlr$pred, type = "l", col = "red")
+```
+
+
+The model with time included as a variable in the MLR had a slightly lower aic, but the forecast is really anyone's guess. For a seven-day prediction, the second (with time included in linear model variables) looks like a reasonable extention of the current trend.
