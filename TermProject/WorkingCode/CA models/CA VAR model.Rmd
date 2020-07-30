@@ -1,0 +1,86 @@
+---
+title: "CA-mlr"
+author: "jeysenbach"
+date: "7/30/2020"
+output: html_document
+---
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tswge)
+library(ggthemes)
+library(nnfor)
+library(zoo)
+library(vars)
+```
+
+```{r, message=FALSE}
+#Import Data obtained from ca.gov
+CA <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/CA_COVID_7.16.20.csv", header = T)
+#Re-format Date
+CA$date <- as.Date(CA$date, format = "%m/%d/%Y")
+head(CA)
+
+Totalhosp <- (CA$hospitalized_covid_confirmed_patients + CA$hospitalized_suspected_covid_patients)
+```
+
+
+# OLD STUFF - needed to create correct variables...
+
+Since we are predicting Hospitalizations, which we determined has no notable seasonality in the CA data, the number of new cases could be transformed into a more useful predictor by calculating the average of the past 7 days.
+
+```{r}
+
+newcases_7dayavg <- zoo::rollmean(CA$newcountconfirmed, k=7, align = "right")
+CA$newcases_7dayavg <- c(CA$newcountconfirmed[1:6],newcases_7dayavg)
+
+#Replot - Avg of last 7 days New Confirmed Cases
+ggplot(data=CA, aes(x=date, y=CA$newcases_7dayavg, group=1)) + 
+  geom_line(color="gold2") + ggtitle("Last 7 Day Avg Confirmed COVID-19 Cases in CA") + 
+  scale_x_date(date_labels = "%b") + xlab("") + ylab("Count") +           theme_fivethirtyeight()
+```
+
+```{r}
+#Cut out the zeros at the beginning of Totalhosp and create equal length variable for new cases that lines up with hospital data
+Totalhosp1 <- Totalhosp[12:119]
+newcases_7dayavg1 <- CA$newcases_7dayavg[5:112]
+```
+
+```{r}
+newcases_7dayavg2 <- newcases_7dayavg[83:108]
+```
+
+
+### California: Vector AR Models
+
+We can use the same variables to model using VAR.
+
+```{r}
+#Create matrix of variables
+var_matrix1 <- cbind(newcases_7dayavg1, Totalhosp1)
+
+#VAR modeling
+#We will model as if the data is stationary
+VARselect(var_matrix1, lag.max = 10, type = "both") #AIC picks 9, BIC picks 1
+vfit1_1 <- VAR(var_matrix1,p=9,type = "both")
+
+#7 Day forecast
+vpreds1_7 <- predict(vfit1_1,n.ahead = 7)
+vpreds1_7$fcst$Totalhosp1
+
+#Plot 7 day forecast
+Time <- seq(1,108,1)
+plot(Time, Totalhosp1, type = "l",xlim = c(0,115),  ylim = c(4000,10000), ylab = "COVID-Related Hospitalized Patients", main = "7 Day Forecast - VAR Model")
+lines(seq(109,115,1), vpreds1_7$fcst$Totalhosp1[,1], type = "l", col = "red")
+```
+
+Again, we'll consider a 90 day forecast based on this model to be unrealisitc based on our expectations.
+
+```{r}
+#90 Day forecast
+vpreds1_90 <- predict(vfit1_1,n.ahead = 90)
+
+#Plot 7 day forecast
+plot(Time, Totalhosp1, type = "l",xlim = c(0,198),  ylim = c(4000,20000), ylab = "COVID-Related Hospitalized Patients", main = "90 Day Forecast - VAR Model")
+lines(seq(109,198,1), vpreds1_90$fcst$Totalhosp1[,1], type = "l", col = "red")
+```
