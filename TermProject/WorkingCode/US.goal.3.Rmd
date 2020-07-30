@@ -125,7 +125,7 @@ inpos.preds7 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, the
 inpos.preds90 = fore.aruma.wge(us$positiveIncrease, phi = est.inpos.seas$phi, theta = est.inpos.seas$theta, d=1, s=7, n.ahead = 90)
 ```
     i. Plotting forecasts
-    
+
 ```{r}
 #7 day forecast
 plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,195), ylim = c(0,80000), ylab = "Increase in COVID Cases", main = "7 Day Increase in COVID Cases Forecast")
@@ -461,33 +461,71 @@ plot(currhosp.fore7)
 ```{r}
 currhosp.fore90 = forecast(mlp.fit1, h = 90, xreg = new.regressor90)
 plot(currhosp.fore90)
-currhosp.fore90$mean
 ```
 
-5. ASEs
-#WHERE YOU LEFT OFF
+5. Windowed ASE
+  a. 7 Day Forecast
 ```{r}
-
-
-#ASE = mean((BS$sales[81:100]-f$mean)^2)
-#ASE
-```
-
-#### Ensemble Model
-
-```{r}
+#if (!require(devtools)) {
+#  install.packages("devtools")
+#}
+#devtools::install_github("josephsdavid/tswgewrapped", build_vignettes = TRUE)
 ```
 
 ```{r}
+library(tswgewrapped)
+```
+
+  - Train/ Test Data Sets
+
+```{r}
+data_train.m <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:122], positiveIncrease = us$positiveIncrease[1:122])
+data_test.m <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[123:132], positiveIncrease = us$positiveIncrease[123:132])
 ```
 
 ```{r}
+# search for best NN hyperparameters in given grid
+model.m = tswgewrapped::ModelBuildNNforCaret$new(data = data_train.m, var_interest = "hospitalizedCurrently",
+                                               search = 'random', tuneLength = 5, parallel = TRUE,
+                                               batch_size = 50, h = 7, m = 7,
+                                               verbose = 1)
+```
+
+  - The ASEs associated with the grid of hyperparameters is shown in the table and heatmap below.
+
+```{r}
+res.m <- model.m$summarize_hyperparam_results()
+res.m
 ```
 
 ```{r}
+model.m$plot_hyperparam_results()
+```
+
+  - Windowed ASE: The best hyperparemeters are shown below
+
+```{r}
+best.m <- model.m$summarize_best_hyperparams()
+best.m
 ```
 
 ```{r}
+final.ase.m <- dplyr::filter(res.m, reps == best.m$reps &
+                    hd == best.m$hd &
+                    allow.det.season == best.m$allow.det.season)[['ASE']]
+final.ase.m
 ```
 
+  - The best hyperparameters based on this grid search are 13 repetitions and 1 hidden layers, and allow.det.season = FALSE which has a mean rolling window ASE of 5.4964555.
 
+```{r}
+# Final Model
+caret_model.m = model.m$get_final_models(subset = 'a')
+caret_model.m$finalModel
+```
+
+  - Plot final model
+```{r}
+# Plot Final Model
+plot(caret_model.m$finalModel)
+```

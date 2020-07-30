@@ -298,150 +298,84 @@ ASE
 
 #### MLR w/ Correlated Errors
 MLR w/ Correlated Errors
-    a. Fit a simple 
+    a. Stationarize data
 
 ```{r}
-us.lm.fit = lm(hospitalizedCurrently~date, data = us)
-us.lm.fit
+#Stationarize Currently Hospitalized Variable
+us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
+acf(us.diff)
+us.diff.seas = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+acf(us.diff.seas)
+#Stationarize Increase Positive Variable
+inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
+acf(inpos.diff)
+inpos.diff.seas = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
+acf(inpos.diff.seas)
 ```
-    b. Diagnose a model using aic.wge: ARMA(2,1)
-
+    b. Fit a simple 
+    
 ```{r}
-us.fit.phi = aic.wge(us.lm.fit$residuals)
-us.fit.phi
+lm.fit2 = lm(us.diff.seas~inpos.diff.seas, data=cbind(data.frame(us.diff.seas), data.frame(inpos.diff.seas)))
+summary(lm.fit2)
+AIC(lm.fit2)
+acf(lm.fit2$residuals)
+plot(lm.fit2$residuals)
 ```
-    c. Fit an aruma model
+    c. Diagnose a model using aic.wge: ARMA(5,2)
 
 ```{r}
-#without d and s
-us.fit.1 = arima(us$hospitalizedCurrently, order = c(us.fit.phi$p,0,us.fit.phi$q))
-us.fit.1
-AIC(us.fit.1)
+lm.phis= aic.wge(lm.fit2$residuals)
+lm.phis
 ```
-    d. Checking for white noise: failure to to reject the H_null tells us the remainer of the data cannot be determined as any different than white noise.
+    d. Fit an aruma model
 
 ```{r}
-acf(us.fit.1$residuals)
-ljung.wge(us.fit.1$residuals) # pval = .1493
+us.fit.2 = arima(us$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7))
+us.fit.2
+AIC(us.fit.2)
 ```
-  e. Predictions
+    e. Checking for white noise: failure to to reject the H_null tells us the remainer of the data cannot be determined as any different than white noise.
 
 ```{r}
-us.preds7 = predict(us.fit.1, n.ahead = 7)
+acf(us.fit.2$residuals)
+ljung.wge(us.fit.2$residuals) # pval = .1493
+```
+  f. Predictions
+  - 7 Day Predictions
+
+```{r}
+us.preds7 = predict(us.fit.2, n.ahead = 7)
 us.preds7$pred
-us.preds90 = predict(us.fit.1, n.ahead = 90)
+```
+  - 90 Day Predictions
+
+```{r}
+us.preds90 = predict(us.fit.2, n.ahead = 90)
 us.preds90$pred
 ```
-  f. Visualiztion of predictions
+  g. Visualiztion of predictions
+  - 7 Day Forecast
 
 ```{r}
 #7 Day Forecast
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,140), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 7 Day Forecast")
 lines(seq(133, 139, 1), us.preds7$pred, type= "l", col = "red")
 ```
+  - 90 Day Forecast
 
 ```{r}
 #90 Day Forecast
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,225), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 90 Day Forecast")
 lines(seq(133, 222, 1), us.preds90$pred, type= "l", col = "red")
 ```
-
-
-
-
-```{r example code}
-# Model cmort based on predicted part and temp using MLR with Cor Erros
-#assuming data is loaded in dataframe CM
-#ksfit = lm(cmort~temp+part+Week, data = CM)
-#phi = aic.wge(ksfit$residuals) #AR(2)
-
-#fit = arima(CM$cmort,order = c(phi$p,0,phi$q), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CM$temp, CM$part, CM$Week))
-
-#AIC(fit) #3166
-
-# Check for whiteness of residuals
-#acf(fit$residuals)
-#ljung.wge(fit$residuals) # pval = .059
-#ljung.wge(fit$residuals, K = 48) # pval = .004
-
-#load the forecasted Part and Temp in a data frame
-#next20 = data.frame(temp = predsTemp$f, part = predsPart$f, Week = seq(509,528,1))
-#get predictions
-#predsCMort = predict(fit,newxreg = next20)
-#plot next 20 cmort wrt time
-#plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
-#lines(seq(509,528,1), predsCMort$pred, type = "l", col = "red")
-
-
-
-
-#Find ASE  Need to forecast last 30 of known series.  
-#CMsmall = CM[1:478,]
-#ksfit = lm(cmort~temp+part+Week, data = CMsmall)
-#phi = aic.wge(ksfit$residuals)
-#fit = arima(CMsmall$cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CMsmall$temp, CMsmall$part, #CMsmall$Week))
-
-#AIC(fit) #2990.101
-
-#last30 = data.frame(temp = CM$temp[479:508], part = CM$part[479:508], CMWeek = seq(479,508,1))
-#get predictions
-#predsCMort = predict(fit,newxreg = last30)
-
-#ASE = mean((CM$cmort[479:508] - predsCMort$pred)^2)
-#ASE #84.2398
-
-#plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "Last 30 Week Cardiac Mortality Forecast")
-#lines(seq(479,508,1), predsCMort$pred, type = "l", col = "red")
-```
-
-
-
-
-
-
-
-#### RNN
-
-- Creating train / test data set
+  h. Windowed ASE 
+  - 7 Day Windowed ASE
 
 ```{r}
-library(nnfor)
-head(us)
-usTrain.nn = ts(us$hospitalizedCurrently[1:122])
 ```
+  - 90 Day Windowed ASE
 
-- Fitting NN model on train data set w/ default settings
-
-```{r}
-us.nn.fit = mlp(usTrain.nn)
-plot(us.nn.fit)
-```
-
-- Forecast horizon/step forward 
-
-```{r}
-us.nn.fit.fore = forecast(us.nn.fit, h=10)
-plot(us.nn.fit.fore)
-```
-
-- Plot forecast against test set
-
-```{r}
-plot(us$hospitalizedCurrently[123:132], type = "l", ylim = c(55000, 80000))
-lines(seq(1:10), us.nn.fit.fore$mean, col = "blue")
-```
-
-- Calculate ASE
-
-```{r}
-ASEus.nn.fit.fore = mean((us$hospitalizedCurrently[123:132]-us.nn.fit.fore$mean)^2)
-ASEus.nn.fit.fore
-```
-
-- Rolling Windowed ASE
-
-- Windowed ASE
-```{r, fig.show="hide", warning=FALSE}
+```{r fig.show="hide", warning=FALSE}
 #phis = est.us.diff.seasBIC$phi
 #thetas = est.us.diff.seasBIC$theta
 
@@ -476,27 +410,43 @@ ASEus.nn.fit.fore
 #ASE
 ```
 
+#### Neural Network Model
 
-#### Ensemble Model
-
-```{r}
-```
+- Creating train / test data set
 
 ```{r}
+library(nnfor)
+head(us)
+usTrain.nn = ts(us$hospitalizedCurrently[1:122])
 ```
+
+- Fitting NN model on train data set w/ default settings
 
 ```{r}
+us.nn.fit = mlp(usTrain.nn, outplot = T, comb = "mean", m=7, reps = 50)
+plot(us.nn.fit)
 ```
+
+- Forecast horizon/step forward 
 
 ```{r}
+us.nn.fit.fore = forecast(us.nn.fit, h=10)
+plot(us.nn.fit.fore)
 ```
+
+- Plot forecast against test set
 
 ```{r}
+plot(us$hospitalizedCurrently[123:132], type = "l", ylim = c(55000, 80000))
+lines(seq(1:10), us.nn.fit.fore$mean, col = "blue")
 ```
+
+- Calculate ASE
 
 ```{r}
+ASEus.nn.fit.fore = mean((us$hospitalizedCurrently[123:132]-us.nn.fit.fore$mean)^2)
+ASEus.nn.fit.fore
 ```
 
-
-
+- Windowed ASE
 
