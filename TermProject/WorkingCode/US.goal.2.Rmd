@@ -15,6 +15,7 @@ library(ggthemes)
 # US COVID Data
 
 ### Data Prep
+In order to prep our data from our EDA we will load, transform the date, remove all zero row from the variable we are testing *hospitalizedCurrently*, and sort from oldest to newet. This will allow us to easily work through our univariate time series evaluations.
 
 ```{r load data}
 us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
@@ -63,7 +64,7 @@ plotts.sample.wge(us$hospitalizedCurrently, lag.max = 100)
 ```
 
 3. Overfit tables
-- Since we are seeing heavy wandering behavior we will use overfit tables to see if we can surface any (1-B) factors that have roots very near the unit circle. 
+- Since we are seeing heavy wandering behavior, we will use overfit tables to see if we can surface any (1-B) factors that have roots very near the unit circle. 
 
   - Below we are able to clearly see 1: (1-B) factor that has a root nearly on the Unit Circle.
 
@@ -72,22 +73,22 @@ est.ar.wge(us$hospitalizedCurrently,p=6,type='burg')
 ```
 
 4. Difference the data based on surfaced (1-B) Factor
-- Once the data has been differenced we see something that looks much closer to a stationary data set. However, we have also surfaced what appears to be a small seasonality component. We see the ACF have higher spikes surface at 7 and 14, which would lead us to believe there is a 7 day seasonal component.
+- Once the data has been differenced, we see something that looks much closer to a stationary data set. However, we have also surfaced what appears to be a small seasonality component. We see the ACF have higher spikes surface at 7 and 14, which would lead us to believe there is a 7-day seasonal component.
 
 ```{r}
 us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
 acf(us.diff)
 ```
 
-5. Seasonailty Transformation
-- Above we have surfaced what appears to be a 7 day seasonality trend. We will now transform the data for the s=7.
+5. Seasonality Transformation
+- Above we have surfaced what appears to be a 7-day seasonality trend. We will now transform the data for the s=7.
 
 ```{r}
 us.diff.seas = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
 ```
 
 6. Diagnose Model w/ aic.wge
-- When we diagnose the the best models to use for our stationary data set we see the R AIC5 function selects an AIC ARMA(5,1) model while the BIC selects a AR(2). The AR(2) model is consistent with our pseudo-cyclic data as well as the dampening cyclical sample autocorrelations that are produced by the transformed data. The ARMA(5,1) could also produce these same traits. We will move forward and compare these two models.
+- When we diagnose the best models to use for our stationary data set, we see the R AIC5 function selects an AIC ARMA(5,1) model while the BIC selects a AR(2). The AR(2) model is consistent with our pseudo-cyclic data as well as the dampening cyclical sample autocorrelations that are produced by the transformed data. The ARMA(5,1) could also produce these same traits. We will move forward and compare these two models.
 
 ```{r}
 aic5.wge(us.diff.seas)
@@ -95,14 +96,14 @@ aic5.wge(us.diff.seas,type = "bic")
 ```
 
 7. Diagnose white noise
-- Both of the Junge Box test show us that we reject the H null with pvalues that are < 0.05 alpha significance level.
+- Both of the Junge Box test show us that we reject the H null with p-values that are < 0.05 alpha significance level.
 
 ```{r}
 ljung.wge(us.diff.seas)$pval
 ljung.wge(us.diff.seas, K=48)$pval
 ```
 
-8. Estiamte Phis and Thetas
+8. Estimate Phis and Thetas
 - AIC Phi and Theta Estimates
 
 ```{r}
@@ -110,7 +111,7 @@ est.us.diff.seasAIC = est.arma.wge(us.diff.seas, p = 5, q=1)
 mean(us$hospitalizedCurrently)
 ```
 
-- BIC Phi Estiamtes
+- BIC Phi Estimates
 
 ```{r}
 est.us.diff.seasBIC = est.arma.wge(us.diff.seas, p = 2)
@@ -118,17 +119,21 @@ mean(us$hospitalizedCurrently)
 ```
 
 ### Univariate ARIMA(5,1,1), s=7 Forecasting
-#### Short Term
+
+- 7-Day Forecast
+
 ```{r}
 shortARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 7, lastn = F, limits = T)
 ```
 
 - AIC
+
 ```{r}
 est.us.diff.seasAIC$aic
 ```
 
-- Windowed ASE
+- Windowed ASE: 14,880,281
+
 ```{r, fig.show="hide", warning=FALSE}
 phis = est.us.diff.seasAIC$phi
 thetas = est.us.diff.seasAIC$theta
@@ -141,7 +146,7 @@ for( i in 1:(124-(trainingSize + horizon) + 1))
 {
   forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1, n.ahead = horizon)
   
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - shortARMA$f)^2)
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - forecasts$f)^2)
          
   ASEHolder[i] = ASE
 }
@@ -156,19 +161,22 @@ summary(ASEHolder)
 WindowedASE
 ```
 
+- ASE: 73,605,156
+
 ```{r}
 fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = 7, lastn = TRUE)
 ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
 ASE
 ```
 
-#### Long Term
+- 90-Day Forecast
 
 ```{r}
 longARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = F, limits = F)
 ```
 
-- Windowed ASE
+- Windowed ASE: 18,103,000,000
+
 ```{r, fig.show="hide", warning=FALSE}
 phis = est.us.diff.seasAIC$phi
 thetas = est.us.diff.seasAIC$theta
@@ -181,7 +189,7 @@ for( i in 1:(124-(trainingSize + horizon) + 1))
 {
   forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
   
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - longARMA$f)^2)
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - forecasts$f)^2)
          
   ASEHolder[i] = ASE
 }
@@ -195,6 +203,8 @@ WindowedASE = mean(ASEHolder)
 summary(ASEHolder)
 WindowedASE
 ```
+
+- ASE: 108,278,159
 
 ```{r}
 fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1, n.ahead = 90, lastn = T)
@@ -204,17 +214,20 @@ ASE
 
 ### Univariate ARIMA(2,1,0), s=7 Forecasting
 
-#### Short Term
+- 7-Day Forecast
+
 ```{r}
 shortAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d=1, s=7, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
 
-- AIC
+  - AIC
+
 ```{r}
 est.us.diff.seasBIC$aic
 ```
 
-- Windowed ASE
+  - Windowed ASE: 15,546,758
+
 ```{r, fig.show="hide", warning=FALSE}
 phis = est.us.diff.seasBIC$phi
 thetas = est.us.diff.seasBIC$theta
@@ -227,7 +240,7 @@ for( i in 1:(124-(trainingSize + horizon) + 1))
 {
   forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1, n.ahead = horizon)
   
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - shortAR$f)^2)
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - forecasts$f)^2)
          
   ASEHolder[i] = ASE
 }
@@ -242,24 +255,22 @@ summary(ASEHolder)
 WindowedASE
 ```
 
+  - ASE: 60,809,514
+
 ```{r}
 fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = 7, lastn = TRUE)
 ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
 ASE
 ```
 
-#### Long Term
+- 90 Day Forecast
+
 ```{r}
 longAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, s= 7, d = 1, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
 
-- ASE
-```{r}
-ASElongAR = mean((us$hospitalizedCurrently[(124-90+1):124]-longAR$f)^2)
-ASElongAR 
-```
+  - Windowed ASE: 19,427,666,679
 
-- Windowed ASE
 ```{r, fig.show="hide", warning=FALSE}
 phis = est.us.diff.seasBIC$phi
 thetas = est.us.diff.seasBIC$theta
@@ -272,7 +283,7 @@ for( i in 1:(124-(trainingSize + horizon) + 1))
 {
   forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
   
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - longAR$f)^2)
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - forecasts$f)^2)
          
   ASEHolder[i] = ASE
 }
@@ -282,12 +293,12 @@ for( i in 1:(124-(trainingSize + horizon) + 1))
 ASEHolder
 hist(ASEHolder)
 WindowedASE = mean(ASEHolder)
-```
 
-```{r}
 summary(ASEHolder)
 WindowedASE
 ```
+
+  - ASE: 185,865,366
 
 ```{r}
 fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = 90, lastn = TRUE)
@@ -295,173 +306,25 @@ ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-
 ASE
 ```
 
+## Univariate Multilayered Perceptron (MLP) / Neural Network Model
+For our univariate NN model we created a training and test data set. This allows us to cross validate our model performance. This is our first NN model and will be used with mostly default parameters. This is to see how our mlp function does in producing a model with few settings. However, with such little data we are also curious how leveraging all of the data changes the trend on the forecast. So, we will model them side by side to see the difference on what the forecasts produce.
 
-#### Univariate MLR w/ Correlated Errors
-MLR w/ Correlated Errors
-1. Stationarize data
-
-```{r}
-#Stationarize Currently Hospitalized Variable
-us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
-acf(us.diff)
-us.diff.seas = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
-acf(us.diff.seas)
-#Stationarize Increase Positive Variable
-inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
-acf(inpos.diff)
-inpos.diff.seas = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
-acf(inpos.diff.seas)
-```
-
-2. Fit a simple 
-    
-```{r}
-lm.fit2 = lm(us.diff.seas~inpos.diff.seas, data=cbind(data.frame(us.diff.seas), data.frame(inpos.diff.seas)))
-summary(lm.fit2)
-AIC(lm.fit2)
-acf(lm.fit2$residuals)
-plot(lm.fit2$residuals)
-```
-
-3. Diagnose a model using aic.wge: ARMA(5,2)
-
-```{r}
-lm.phis= aic.wge(lm.fit2$residuals)
-lm.phis
-```
-
-4. Fit an aruma model
-
-```{r}
-us.fit.2 = arima(us$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7))
-us.fit.2
-AIC(us.fit.2)
-```
-
-5. Checking for white noise: failure to to reject the H_null tells us the remainer of the data cannot be determined as any different than white noise.
-
-```{r}
-acf(us.fit.2$residuals)
-ljung.wge(us.fit.2$residuals) # pval = .1493
-```
-
-6. Predictions
-- 7 Day Predictions
-
-```{r}
-us.preds7 = predict(us.fit.2, n.ahead = 7)
-us.preds7$pred
-```
-
-- 90 Day Predictions
-
-```{r}
-us.preds90 = predict(us.fit.2, n.ahead = 90)
-us.preds90$pred
-```
-
-7. Visualiztion of predictions
-- 7 Day Forecast
-
-```{r}
-#7 Day Forecast
-plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,140), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 7 Day Forecast")
-lines(seq(133, 139, 1), us.preds7$pred, type= "l", col = "red")
-```
-
-- 90 Day Forecast
-
-```{r}
-#90 Day Forecast
-plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,225), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 90 Day Forecast")
-lines(seq(133, 222, 1), us.preds90$pred, type= "l", col = "red")
-```
-
-8. Windowed ASE 
-- 7 Day Windowed ASE: 316,360,314
-
-```{r fig.show="hide", warning=FALSE}
-phis = lm.phis$phi
-thetas = lm.phis$theta
-
-trainingSize = 20
-horizon = 7
-ASEHolder = numeric()
-
-for( i in 1:(124-(trainingSize + horizon) + 1))
-{
-  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
-  
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - us.preds7$pred)^2)
-         
-  ASEHolder[i] = ASE
-}
-```
-
-```{r}
-ASEHolder
-hist(ASEHolder)
-WindowedASE = mean(ASEHolder)
-```
-
-```{r}
-summary(ASEHolder)
-WindowedASE
-```
-
-- 90 Day Windowed ASE: 231,257,009
-
-```{r fig.show="hide", warning=FALSE}
-phis = lm.phis$phi
-thetas = lm.phis$theta
-
-trainingSize = 20
-horizon = 90
-ASEHolder = numeric()
-
-for( i in 1:(124-(trainingSize + horizon) + 1))
-{
-  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
-  
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - us.preds90$pred)^2)
-         
-  ASEHolder[i] = ASE
-}
-```
-
-```{r}
-ASEHolder
-hist(ASEHolder)
-WindowedASE = mean(ASEHolder)
-```
-
-```{r}
-summary(ASEHolder)
-WindowedASE
-```
-
-```{r}
-#fs = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize+horizon)-1)],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = 90, lastn = TRUE)
-#ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs$f )^2)
-#ASE
-```
-
-## Univariate MLP / Neural Network Model
 1. Creating train / test data set
 
 ```{r}
 library(nnfor)
 head(us)
-usTrain.nn = ts(us$hospitalizedCurrently[1:122])
+usTrain.nn = ts(us$hospitalizedCurrently[1:125])
 ```
 
 2. Fitting NN model
-  a. Fitted model on train data set. We did this to see just how different merely 7 days can mean to a model.
+  a. Fitted model on train data set. While we will continue to build on model on the train data set to get our ASE etc. We did want to see how 7 days can change  We did this to see just how different merely 7 days can mean to a model.
 
 ```{r}
 us.nn.fit = mlp(usTrain.nn, outplot = T, comb = "mean", m=7, reps = 50)
 plot(us.nn.fit)
 ```
+
   b. Fitted a model on the full data set. It shows that the same model is developed but we want to see how this affects our forecast. We suspect a data point up or down can drastically change the trend of the forecast.
   
 ```{r}
@@ -470,43 +333,60 @@ plot(us.nn.fit2)
 ```
 
 3. Forecast horizon/step forward
-  a. With jus tthe trained data set being used we see a very highly likely hood of increased trend. We don't see a lot of hope for the severity of the cases dropping.
-
+  a. With just the trained data set being used we see a slightly trend upward in the 7-day forecast. However, the 90 day forecast is showing a much larger lift in trend towards the end of the forecast. We see a large lift in numbers. We also see the plausible range for the possibilities is also high. The NN models give us a glimpse into how difficult it is to forecast something like COVID hospitalization cases. With such limited data, and the lack of ability to know if we've completed a full 'cycle' for predictions against leaves us with many possible outcomes and the NN forecast shows us this by the large range of possible outcomes and the mean in blue in the center. 
+  - 7-Day Forecast
+    
 ```{r}
-us.nn.fit.fore = forecast(us.nn.fit, h=10)
-plot(us.nn.fit.fore)
+us.nn.fit.fore7 = forecast(us.nn.fit, h=7)
+plot(us.nn.fit.fore7)
 ```
-  b. As we suspected the forecast drastically changes for that of the full data set than the trained. We can see that those extra days of showing a downward trend project a much more manageable curve for COVID and what might be the need for forecasting supplies etc. This is important to take into account and means a daily update of the model would be needed to accurately forecast any future trend or predictions.
+
+  - 90-Day Forecast
 
 ```{r}
-us.nn.fit.fore2 = forecast(us.nn.fit2, h=10)
+us.nn.fit.fore90 = forecast(us.nn.fit, h=90)
+plot(us.nn.fit.fore90)
+```
+
+  b. For the 7-day forecast we still see an extensive range for the NN models, we do see a change in trend for full data set than the trained. We can see that those extra days of showing a downward trend project instead of a flat level for COVID hospitalized patients. This would be essentially a difference in being able to reduce supplies versus needing supplies to remain the same. This is important to take into account and means a daily update of the model would be needed to accurately forecast any future trend or predictions. For the 90-day forecast we see a similar change in trend. For the 90-day forecast based on the trained data set we expect to see a large increase in trend for the 90-day forecast. This could be useful, however, seems like it is performing directly opposite to what we expect from novel virus. 
+  - 7 Day Forecast
+
+```{r}
+us.nn.fit.fore2 = forecast(us.nn.fit2, h=7)
+plot(us.nn.fit.fore2)
+```
+
+  - 90-Day Forecast
+
+```{r}
+us.nn.fit.fore2 = forecast(us.nn.fit2, h=90)
 plot(us.nn.fit.fore2)
 ```
 
 4. Plot forecast against test set
   
 ```{r}
-plot(us$hospitalizedCurrently[123:132], type = "l", ylim = c(55000, 80000))
-lines(seq(1:10), us.nn.fit.fore$mean, col = "blue")
+plot(us$hospitalizedCurrently[126:132], type = "l", ylim = c(55000, 80000))
+lines(seq(1:7), us.nn.fit.fore7$mean, col = "blue")
 ```
 
-5. Simple ASE
+5. ASE: 1,302,298
 
 ```{r}
-ASEus.nn.fit.fore = mean((us$hospitalizedCurrently[123:132]-us.nn.fit.fore$mean)^2)
+ASEus.nn.fit.fore = mean((us$hospitalizedCurrently[126:132]-us.nn.fit.fore7$mean)^2)
 ASEus.nn.fit.fore
 ```
 
 ### MLP NN Model Analysis
-We completed a default neural network model. With so many opportunities for how to actually tune neural network model we knew this would not be our best model in this case. So we moved forward with a hypertuned neural network model that allows us to calculate many windowed ASEs and compare those model against eachother.
+We completed a default neural network model. With so many opportunities for how to actually tune neural network model we knew this would not be our best model in this case. So, we moved forward with a hyper tuned neural network model for our ensemble model that allows us to calculate many windowed ASEs and compare those models against each other.
 
-## Ensemble Model / Hypertuned NN Model
+## Ensemble Model / Hyper tuned NN Model
 
 ```{r}
 library(tswgewrapped)
 ```
 
-1. Train/ Test Data Sets
+1. Train / Test Data Sets
 
 ```{r}
 data_train.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:122], positiveIncrease = rnorm(122, 0, .0001))
@@ -514,6 +394,7 @@ data_test.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[123:1
 ```
 
 2. Hyper tune parameters
+- Here we are running specialty function contained in tswgewrapped package that allows us to perform a grid search that will complete the tuning of all parameters to obtain the one with the lowest windowed ASE.
 
 ```{r}
 # search for best NN hyperparameters in given grid
@@ -534,7 +415,7 @@ res.u
 model.u$plot_hyperparam_results()
 ```
 
-4. Best Parameters shown in below table. The best hyperparameters based on this grid search are 16 repetitions and 1 hidden layers, and allow.det.season = FALSE .
+4. Best Parameters shown in below table. The best hyperparameters based on this grid search are 16 repetitions and 1 hidden layer, and allow.det.season = FALSE.
 
 ```{r}
 best.u <- model.u$summarize_best_hyperparams()
@@ -563,17 +444,72 @@ caret_model.u$finalModel
 plot(caret_model.u$finalModel)
 ```
 
-7. Forecasts
-  - 7 Day
+7. Train ensemble model
+  - Since we came across an interesting outcome with our nn default model above when we reviewed the forecasts on the trained data vs full data set; we will do the same with our hypertuned parameters ensemble model.
+  a. First we build our ensemble model on the trained data set.
 
 ```{r}
-fore7.u = forecast(caret_model.u$finalModel, h=7)
-plot(fore7.u)
+#Ensemble model trained data
+ensemble.mlp.u1 = nnfor::mlp(usTrain.nn, outplot = T, reps = 16, hd = 1, allow.det.season = F)
+ensemble.mlp.u1
 ```
 
-  - 90 Day
+  b. Next we build our model on the entirity data set. 
+
+```{r}
+#Ensemble model
+ensemble.mlp.u2 = nnfor::mlp(ts(us$hospitalizedCurrently), outplot = T, reps = 16, hd = 1, allow.det.season = F)
+ensemble.mlp.u2
+```
+
+  - 7-Day
+  a. First we will 7-day forecast our trained data set. As we can see we see a flattening of the forecast over the next 7 days witha  slight downward trend.. 
+
+```{r}
+fore7.1.u = forecast(ensemble.mlp.u1 , h=7)
+plot(fore7.1.u)
+```
+
+  b. Next we forecasted the 7-day for our full data set. We see a much strong downward trend in our 7 day forecast.
   
 ```{r}
-fore90.u = forecast(caret_model.u$finalModel, h=90)
-plot(fore90.u)
+fore7.2.u = forecast(ensemble.mlp.u2, h=7)
+plot(fore7.2.u)
 ```
+
+  - 90-Day
+  a. With our 90-day trained data set forecast we see a very strong downward trend. With a possibility of a variation of this trend being a little less straight (shown by the shadowed line that is slightly higher than the highlighted blue mean).
+
+```{r}
+fore90.1.u = forecast(ensemble.mlp.u1, h=90)
+plot(fore90.1.u)
+```
+
+  b. Full data set. We see a clear downward trend and that the COVID hospitalized cases will eventually reach zero. The possibilities all stay closely to the mean and there doesn't seem to be much of a chance of a deviation from this model.
+
+```{r}
+fore90.2.u = forecast(ensemble.mlp.u2, h=90)
+plot(fore90.2.u)
+```
+
+## Model Analysis
+Upon completion of the above models we can see that the most important take away is that each data point is essential in determining the trend of the COVID virus. We can see that with cross validation methods we can see a trend but as each of those data points become a piece of the model the trend alters day by day. It will be essential moving forward that models are update daily to be able to acquire a good trend and therefore ability to forecast the needs for hospitalizes and the severity of COVID moving forward.
+
+When investigating these models, it became clear that the 90-day forecasts were simply repeating the trend and seasonality without much extrapolation that we would recommend using for long term forecast. We would only recommend using the short 7 day forecast for predicting hospital equipment and staffing needs. The ensemble model had the lowest windowed ASE and is what we recommend moving forward for these short term forecasts.
+
+### Univariate ARIMA(5,1,1), s=7 Forecasting
+- 7-Day
+  - 14,880,281
+
+- 90-Day
+  - 18,103,000,000
+
+### Univariate ARIMA(2,1,0), s=7 Forecasting
+- 7-Day
+    - 15,546,758
+
+- 90-Day
+    - 19,427,666,679
+
+### Ensemble Model
+- 12,177,586
