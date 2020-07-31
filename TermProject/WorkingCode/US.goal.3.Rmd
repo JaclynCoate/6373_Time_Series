@@ -1,7 +1,7 @@
 ---
 title: "Goal 3 Multivariate: US"
-author: "Jaclyn A Coate"
-date: "7/28/2020"
+author: "Jaclyn Coate & Josh Eysenbach"
+date: "7/31/2020"
 output: html_document
 ---
 
@@ -322,12 +322,64 @@ lines(seq(133,222,1), mlr1.preds90.t$pred, type = "l", col = "red")
 ```
 
 9. Windowed ASE
-  a. 7 Day
-```{r}
+  a. 7 Day: 369,785,216
+```{r fig.show="hide", warning=FALSE}
+phis = mlr.phis$phi
+thetas = mlr.phis$theta
+
+trainingSize = 20
+horizon = 7
+ASEHolder = numeric()
+
+for( i in 1:(124-(trainingSize + horizon) + 1))
+{
+  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
+  
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - mlr1.preds7.t$pred)^2)
+         
+  ASEHolder[i] = ASE
+}
 ```
 
-  b. 90 Day
 ```{r}
+ASEHolder
+hist(ASEHolder)
+WindowedASE = mean(ASEHolder)
+```
+
+```{r}
+summary(ASEHolder)
+WindowedASE
+```
+
+  b. 90 Day: 1,054,226,906
+```{r fig.show="hide", warning=FALSE}
+phis = mlr.phis$phi
+thetas = mlr.phis$theta
+
+trainingSize = 20
+horizon = 90
+ASEHolder = numeric()
+
+for( i in 1:(124-(trainingSize + horizon) + 1))
+{
+  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
+  
+  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - mlr1.preds90.t$pred)^2)
+         
+  ASEHolder[i] = ASE
+}
+```
+
+```{r}
+ASEHolder
+hist(ASEHolder)
+WindowedASE = mean(ASEHolder)
+```
+
+```{r}
+summary(ASEHolder)
+WindowedASE
 ```
 
 ### Forecast Dependent Variable: MLR w/ Correlated Errors (lagged variables) for Currently Hospitalized Patients w/ Positive Increase & Trend
@@ -481,8 +533,19 @@ currhosp.fore90 = forecast(mlp.fit1, h = 90, xreg = new.regressor90)
 plot(currhosp.fore90)
 ```
 
-5. Windowed ASE
-  a. 7 Day Forecast
+5. Simple ASE
+
+```{r}
+ASEmlr = mean((us$hospitalizedCurrently[126:132]-currhosp.fore7$mean)^2)
+ASEmlr
+```
+
+### MLP NN Model Analysis
+We completed a default neural network model. With so many opportunities for how to actually tune neural network model we knew this would not be our best model in this case. So we moved forward with a hypertuned neural network model that allows us to calculate many windowed ASEs and compare those model against eachother.
+
+## Ensemble Model / Hypertuned NN Model
+We have leveraged the tswgewrapper code above to produce a hyperparameter tuned NN model for our ensemble model. This model will work as our higher functioning ensemble model. Below are the steps to surface the best hyperparameters based on our grid search
+
 ```{r}
 #if (!require(devtools)) {
 #  install.packages("devtools")
@@ -494,12 +557,14 @@ plot(currhosp.fore90)
 library(tswgewrapped)
 ```
 
-  - Train/ Test Data Sets
+1. Train/ Test Data Sets
 
 ```{r}
 data_train.m <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:122], positiveIncrease = us$positiveIncrease[1:122])
 data_test.m <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[123:132], positiveIncrease = us$positiveIncrease[123:132])
 ```
+
+2. Hyper tune parameters
 
 ```{r}
 # search for best NN hyperparameters in given grid
@@ -509,7 +574,7 @@ model.m = tswgewrapped::ModelBuildNNforCaret$new(data = data_train.m, var_intere
                                                verbose = 1)
 ```
 
-  - The ASEs associated with the grid of hyperparameters is shown in the table and heatmap below.
+3. The windowed ASEs associated with the grid of hyperparameters is shown in the table and heatmap below.
 
 ```{r}
 res.m <- model.m$summarize_hyperparam_results()
@@ -520,12 +585,14 @@ res.m
 model.m$plot_hyperparam_results()
 ```
 
-  - The best hyperparemeters are shown below
+4. Best Parameters shown in below table. The best hyperparameters based on this grid search are 10 repetitions and 2 hidden layers, and allow.det.season = TRUE .
 
 ```{r}
 best.m <- model.m$summarize_best_hyperparams()
 best.m
 ```
+
+5. Windowed ASE of 13,970,241.
 
 ```{r}
 final.ase.m <- dplyr::filter(res.m, reps == best.m$reps &
@@ -534,7 +601,7 @@ final.ase.m <- dplyr::filter(res.m, reps == best.m$reps &
 final.ase.m
 ```
 
-  - The best hyperparameters based on this grid search are 10 repetitions and 2 hidden layers, and allow.det.season = FALSE which has a mean windowed ASE of 13,970,241. 
+6. Ensemble model characteristics and plot
 
 ```{r}
 # Final Model
@@ -542,38 +609,33 @@ caret_model.m = model.m$get_final_models(subset = 'a')
 caret_model.m$finalModel
 ```
 
-  - Plot final model
 ```{r}
 # Plot Final Model
 plot(caret_model.m$finalModel)
 ```
 
-## Ensemble Model / Hypertuned NN Model
-We have leveraged the tswgewrapper code above to produce a hyperparameter tuned NN model for our ensemble model. This model will work as our higher functioning ensemble model. Below are the steps to surface the best hyperparameters based on our grid search
-
-  - The best hyperparameters based on this grid search are 16 repetitions and 1 hidden layers, and allow.det.season = FALSE which has a mean windowed ASE of 13,970,241.
+6. Forecasts
+  - Model final with best hyper parameters from above and regressor of positive increaser of COVID cases.
 
 ```{r}
 #Ensemble model
 ensemble.mlp = mlp(tUScurrhop, xreg = tUSx, outplot = T, reps = 10, hd = 2, allow.det.season = T)
 ensemble.mlp
 ```
-
-  - Plot ensemble model
   
 ```{r}
 #Plot ensemble model
 plot(ensemble.mlp)
 ```
 
-  - Forecast 7 Day
+  - 7 Day
 
 ```{r}
 fore7.m = forecast(ensemble.mlp, xreg = new.regressor7, h=7)
 plot(fore7.m)
 ```
 
-  - Forecast 90 Day
+  - 90 Day
   
 ```{r}
 fore90.m = forecast(ensemble.mlp, xreg = new.regressor90, h=90)
