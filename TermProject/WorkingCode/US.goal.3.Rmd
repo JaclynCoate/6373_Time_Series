@@ -520,7 +520,7 @@ res.m
 model.m$plot_hyperparam_results()
 ```
 
-  - Windowed ASE: The best hyperparemeters are shown below
+  - The best hyperparemeters are shown below
 
 ```{r}
 best.m <- model.m$summarize_best_hyperparams()
@@ -534,7 +534,7 @@ final.ase.m <- dplyr::filter(res.m, reps == best.m$reps &
 final.ase.m
 ```
 
-  - The best hyperparameters based on this grid search are 13 repetitions and 1 hidden layers, and allow.det.season = FALSE which has a mean windowed ASE.
+  - The best hyperparameters based on this grid search are 10 repetitions and 2 hidden layers, and allow.det.season = FALSE which has a mean windowed ASE of 13,970,241. 
 
 ```{r}
 # Final Model
@@ -546,4 +546,36 @@ caret_model.m$finalModel
 ```{r}
 # Plot Final Model
 plot(caret_model.m$finalModel)
+```
+
+## Ensemble Model / Hypertuned NN Model
+We have leveraged the tswgewrapper code above to produce a hyperparameter tuned NN model for our ensemble model. This model will work as our higher functioning ensemble model. Below are the steps to surface the best hyperparameters based on our grid search
+
+  - The best hyperparameters based on this grid search are 16 repetitions and 1 hidden layers, and allow.det.season = FALSE which has a mean windowed ASE of 13,970,241.
+
+```{r}
+#Ensemble model
+ensemble.mlp = mlp(tUScurrhop, xreg = tUSx, outplot = T, reps = 10, hd = 2, allow.det.season = T)
+ensemble.mlp
+```
+
+  - Plot ensemble model
+  
+```{r}
+#Plot ensemble model
+plot(ensemble.mlp)
+```
+
+  - Forecast 7 Day
+
+```{r}
+fore7.m = forecast(ensemble.mlp, xreg = new.regressor7, h=7)
+plot(fore7.m)
+```
+
+  - Forecast 90 Day
+  
+```{r}
+fore90.m = forecast(ensemble.mlp, xreg = new.regressor90, h=90)
+plot(fore90.m)
 ```
