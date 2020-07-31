@@ -14,7 +14,7 @@ library(ggthemes)
 
 # US COVID Data
 
-## Data Prep
+### Data Prep
 
 ```{r load data}
 us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
@@ -27,12 +27,13 @@ us = us[order(as.Date(us$date, format = "%Y%m%d")),]
 head(us)
 ```
 
-## Forecast Current Hospitalizations
+### Stationarity: Current Hospitalizations
 It is difficult to assume stationarity for this data due to multiple factors. We are working under the assumption that COVID is a novel virus and cases as well as hospitalizations will eventually return to zero. This being said our current modeling techniques do things such as return to the median or mimic the previously seen trends. Also, we see a heavy wandering trend in both new cases and hospitalization would be dependent on this as well as time. We will review the data and see what, if any, non-stationary components reveal themselves and model the data accordingly.
 
-### Original Data Realization
-Traits:
+## Univariate AR/ARMA Modeling
 
+1.  Original Realization Analysis
+Traits:
 - Heavy wandering behavior 
 - What appears to be some noise that could be pseudo-cyclic behavior hidden by the large numbers.
 
@@ -43,9 +44,8 @@ ggplot(data = us, aes(x=date, y=hospitalizedCurrently))+
     theme_fivethirtyeight()
 ```
 
-### Sample Realization, ACF, and Spectral Density
+2. Sample Realization, ACF, and Spectral Density
 Realization:
-
   - Heavy wandering behavior 
   - Possible small pseudo-cyclic behavior
 
@@ -62,8 +62,8 @@ Spectral Density:
 plotts.sample.wge(us$hospitalizedCurrently, lag.max = 100)
 ```
 
-### Overfit tables
-Since we are seeing heavy wandering behavior we will use overfit tables to see if we can surface any (1-B) factors that have roots very near the unit circle. 
+3. Overfit tables
+- Since we are seeing heavy wandering behavior we will use overfit tables to see if we can surface any (1-B) factors that have roots very near the unit circle. 
 
   - Below we are able to clearly see 1: (1-B) factor that has a root nearly on the Unit Circle.
 
@@ -71,54 +71,54 @@ Since we are seeing heavy wandering behavior we will use overfit tables to see i
 est.ar.wge(us$hospitalizedCurrently,p=6,type='burg')
 ```
 
-### Difference the data based on surfaced (1-B) Factor
-Once the data has been differenced we see something that looks much closer to a stationary data set. However, we have also surfaced what appears to be a small seasonality component. We see the ACF have higher spikes surface at 7 and 14, which would lead us to believe there is a 7 day seasonal component.
+4. Difference the data based on surfaced (1-B) Factor
+- Once the data has been differenced we see something that looks much closer to a stationary data set. However, we have also surfaced what appears to be a small seasonality component. We see the ACF have higher spikes surface at 7 and 14, which would lead us to believe there is a 7 day seasonal component.
 
 ```{r}
 us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
 acf(us.diff)
 ```
 
-### Seasonailty Transformation
-Above we have surfaced what appears to be a 7 day seasonality trend. We will now transform the data for the s=7.
+5. Seasonailty Transformation
+- Above we have surfaced what appears to be a 7 day seasonality trend. We will now transform the data for the s=7.
 
 ```{r}
 us.diff.seas = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
 ```
 
-### Diagnose Model w/ aic.wge
-When we diagnose the the best models to use for our stationary data set we see the R AIC5 function selects an AIC ARMA(5,1) model while the BIC selects a AR(2). The AR(2) model is consistent with our pseudo-cyclic data as well as the dampening cyclical sample autocorrelations that are produced by the transformed data. The ARMA(5,1) could also produce these same traits. We will move forward and compare these two models.
+6. Diagnose Model w/ aic.wge
+- When we diagnose the the best models to use for our stationary data set we see the R AIC5 function selects an AIC ARMA(5,1) model while the BIC selects a AR(2). The AR(2) model is consistent with our pseudo-cyclic data as well as the dampening cyclical sample autocorrelations that are produced by the transformed data. The ARMA(5,1) could also produce these same traits. We will move forward and compare these two models.
 
 ```{r}
 aic5.wge(us.diff.seas)
 aic5.wge(us.diff.seas,type = "bic")
 ```
 
-### Diagnose white noise
-Both of the Junge Box test show us that we reject the H null with pvalues that are < 0.05 alpha significance level.
+7. Diagnose white noise
+- Both of the Junge Box test show us that we reject the H null with pvalues that are < 0.05 alpha significance level.
 
 ```{r}
 ljung.wge(us.diff.seas)$pval
 ljung.wge(us.diff.seas, K=48)$pval
 ```
 
-### Estiamte Phis and Thetas
-AIC Phi and Theta Estimates
+8. Estiamte Phis and Thetas
+- AIC Phi and Theta Estimates
+
 ```{r}
 est.us.diff.seasAIC = est.arma.wge(us.diff.seas, p = 5, q=1)
 mean(us$hospitalizedCurrently)
 ```
 
-BIC Phi Estiamtes
+- BIC Phi Estiamtes
+
 ```{r}
 est.us.diff.seasBIC = est.arma.wge(us.diff.seas, p = 2)
 mean(us$hospitalizedCurrently)
 ```
 
-### Univariate Forecasts
-
-#### ARIMA(5,1,1), s=7
-##### Short Term
+### Univariate ARIMA(5,1,1), s=7 Forecasting
+#### Short Term
 ```{r}
 shortARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 7, lastn = F, limits = T)
 ```
@@ -162,7 +162,7 @@ ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-
 ASE
 ```
 
-##### Long Term
+#### Long Term
 
 ```{r}
 longARMA <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasAIC$phi, theta = est.us.diff.seasAIC$theta, d= 1, s = 7, n.ahead = 90, lastn = F, limits = F)
@@ -202,9 +202,9 @@ ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-
 ASE
 ```
 
-#### ARIMA(2,1,0)
+### Univariate ARIMA(2,1,0), s=7 Forecasting
 
-##### Short Term
+#### Short Term
 ```{r}
 shortAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, d=1, s=7, n.ahead = 7, lastn = FALSE, limits = FALSE)
 ```
@@ -248,7 +248,7 @@ ASE = mean((us$hospitalizedCurrently[(i+trainingSize):(i+(trainingSize+horizon)-
 ASE
 ```
 
-##### Long Term
+#### Long Term
 ```{r}
 longAR <- fore.aruma.wge(us$hospitalizedCurrently, phi = est.us.diff.seasBIC$phi, s= 7, d = 1, n.ahead = 90, lastn = FALSE, limits = FALSE)
 ```
@@ -296,9 +296,9 @@ ASE
 ```
 
 
-#### MLR w/ Correlated Errors
+#### Univariate MLR w/ Correlated Errors
 MLR w/ Correlated Errors
-    a. Stationarize data
+1. Stationarize data
 
 ```{r}
 #Stationarize Currently Hospitalized Variable
@@ -312,7 +312,8 @@ acf(inpos.diff)
 inpos.diff.seas = artrans.wge(inpos.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
 acf(inpos.diff.seas)
 ```
-    b. Fit a simple 
+
+2. Fit a simple 
     
 ```{r}
 lm.fit2 = lm(us.diff.seas~inpos.diff.seas, data=cbind(data.frame(us.diff.seas), data.frame(inpos.diff.seas)))
@@ -321,59 +322,68 @@ AIC(lm.fit2)
 acf(lm.fit2$residuals)
 plot(lm.fit2$residuals)
 ```
-    c. Diagnose a model using aic.wge: ARMA(5,2)
+
+3. Diagnose a model using aic.wge: ARMA(5,2)
 
 ```{r}
 lm.phis= aic.wge(lm.fit2$residuals)
 lm.phis
 ```
-    d. Fit an aruma model
+
+4. Fit an aruma model
 
 ```{r}
 us.fit.2 = arima(us$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7))
 us.fit.2
 AIC(us.fit.2)
 ```
-    e. Checking for white noise: failure to to reject the H_null tells us the remainer of the data cannot be determined as any different than white noise.
+
+5. Checking for white noise: failure to to reject the H_null tells us the remainer of the data cannot be determined as any different than white noise.
 
 ```{r}
 acf(us.fit.2$residuals)
 ljung.wge(us.fit.2$residuals) # pval = .1493
 ```
-  f. Predictions
-  - 7 Day Predictions
+
+6. Predictions
+- 7 Day Predictions
 
 ```{r}
 us.preds7 = predict(us.fit.2, n.ahead = 7)
 us.preds7$pred
 ```
-  - 90 Day Predictions
+
+- 90 Day Predictions
 
 ```{r}
 us.preds90 = predict(us.fit.2, n.ahead = 90)
 us.preds90$pred
 ```
-  g. Visualiztion of predictions
-  - 7 Day Forecast
+
+7. Visualiztion of predictions
+- 7 Day Forecast
 
 ```{r}
 #7 Day Forecast
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,140), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 7 Day Forecast")
 lines(seq(133, 139, 1), us.preds7$pred, type= "l", col = "red")
 ```
-  - 90 Day Forecast
+
+- 90 Day Forecast
 
 ```{r}
 #90 Day Forecast
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,225), ylab = "Currently Hospitalized COVID Patients", main = "Currently Hospitalized COVID Patients 90 Day Forecast")
 lines(seq(133, 222, 1), us.preds90$pred, type= "l", col = "red")
 ```
-  h. Windowed ASE 
-  - 7 Day Windowed ASE
+
+8. Windowed ASE 
+- 7 Day Windowed ASE
 
 ```{r}
 ```
-  - 90 Day Windowed ASE
+
+- 90 Day Windowed ASE
 
 ```{r fig.show="hide", warning=FALSE}
 #phis = est.us.diff.seasBIC$phi
@@ -410,9 +420,8 @@ lines(seq(133, 222, 1), us.preds90$pred, type= "l", col = "red")
 #ASE
 ```
 
-#### Neural Network Model
-
-- Creating train / test data set
+## Univariate MLP / Neural Network Model
+1. Creating train / test data set
 
 ```{r}
 library(nnfor)
@@ -420,35 +429,44 @@ head(us)
 usTrain.nn = ts(us$hospitalizedCurrently[1:122])
 ```
 
-- Fitting NN model on train data set w/ default settings
+2. Fitting NN model on train data set w/ default settings
+  - Here we fit full & training set. Full training set used for windowed ASE in step 6
 
 ```{r}
 us.nn.fit = mlp(usTrain.nn, outplot = T, comb = "mean", m=7, reps = 50)
 plot(us.nn.fit)
+
+
+us.nn.fit2 = mlp(ts(us$hospitalizedCurrently), outplot = T, comb = "mean", m=7, reps = 50)
+plot(us.nn.fit2)
 ```
 
-- Forecast horizon/step forward 
+3. Forecast horizon/step forward
+  - Here we fit full & training set. Full training set used for windowed ASE in step 6
 
 ```{r}
 us.nn.fit.fore = forecast(us.nn.fit, h=10)
 plot(us.nn.fit.fore)
+
+us.nn.fit.fore2 = forecast(us.nn.fit2, h=10)
+plot(us.nn.fit.fore2)
 ```
 
-- Plot forecast against test set
+4. Plot forecast against test set
 
 ```{r}
 plot(us$hospitalizedCurrently[123:132], type = "l", ylim = c(55000, 80000))
 lines(seq(1:10), us.nn.fit.fore$mean, col = "blue")
 ```
 
-- Calculate ASE
+5. Calculate ASE
 
 ```{r}
 ASEus.nn.fit.fore = mean((us$hospitalizedCurrently[123:132]-us.nn.fit.fore$mean)^2)
 ASEus.nn.fit.fore
 ```
 
-- Windowed ASE
+6. Windowed ASE
 ```{r}
 library(tswgewrapped)
 ```
