@@ -497,7 +497,7 @@ fore90.2.u = forecast(ensemble.mlp.u2, h=90)
 plot(fore90.2.u)
 ```
 
-## Model Analysis
+## Univaraite Model Analysis
 Upon completion of the above models we can see that the most important take away is that each data point is essential in determining the trend of the COVID virus. We can see that with cross validation methods we can see a trend but as each of those data points become a piece of the model the trend alters day by day. It will be essential moving forward that models are update daily to be able to acquire a good trend and therefore ability to forecast the needs for hospitalizes and the severity of COVID moving forward.
 
 When investigating these models, it became clear that the 90-day forecasts were simply repeating the trend and seasonality without much extrapolation that we would recommend using for long term forecast. We would only recommend using the short 7 day forecast for predicting hospital equipment and staffing needs. The ensemble model had the lowest windowed ASE and is what we recommend moving forward for these short term forecasts.
