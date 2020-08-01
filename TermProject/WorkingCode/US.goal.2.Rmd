@@ -371,10 +371,15 @@ lines(seq(1:7), us.nn.fit.fore7$mean, col = "blue")
 ```
 
 5. ASE: 1,302,298
-
+  -7-Day
 ```{r}
-ASEus.nn.fit.fore = mean((us$hospitalizedCurrently[126:132]-us.nn.fit.fore7$mean)^2)
-ASEus.nn.fit.fore
+ASEus.nn.fit.fore7 = mean((us$hospitalizedCurrently[126:132]-us.nn.fit.fore7$mean)^2)
+ASEus.nn.fit.fore7
+```
+  -90-Day
+```{r}
+ASEus.nn.fit.fore90 = mean((us$hospitalizedCurrently[43:132]-us.nn.fit.fore90$mean)^2)
+ASEus.nn.fit.fore90
 ```
 
 ### MLP NN Model Analysis
@@ -497,19 +502,27 @@ Upon completion of the above models we can see that the most important take away
 
 When investigating these models, it became clear that the 90-day forecasts were simply repeating the trend and seasonality without much extrapolation that we would recommend using for long term forecast. We would only recommend using the short 7 day forecast for predicting hospital equipment and staffing needs. The ensemble model had the lowest windowed ASE and is what we recommend moving forward for these short term forecasts.
 
-### Univariate ARIMA(5,1,1), s=7 Forecasting
-- 7-Day
+## Univariate Model Performance Breakdown
+### ARIMA(5,1,1), s=7 Forecasting
+- 7-Day Windowed ASE
   - 14,880,281
 
-- 90-Day
+- 90-Day Windowed ASE
   - 18,103,000,000
 
-### Univariate ARIMA(2,1,0), s=7 Forecasting
-- 7-Day
+### ARIMA(2,1,0), s=7 Forecasting
+- 7-Day Windowed ASE
     - 15,546,758
 
-- 90-Day
+- 90-Day Windowed ASE
     - 19,427,666,679
 
-### Ensemble Model
-- 12,177,586
+### Default Neural Network Model
+- 7-Day ASE
+  - 1,511,391
+- 90-Day ASE
+  - 844,457,147
+
+### Ensemble Model: Hyper Tuned Neural Network Model
+- 7-Day Windowed ASE
+  - 12,177,586
