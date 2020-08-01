@@ -17,6 +17,7 @@ library(tswge)
 # US COVID Data
 
 ## Data Prep
+In order to prep our data from our EDA we will load, transform the date, remove all zero row from the variable we are testing *hospitalizedCurrently*, and sort from oldest to newest. This will allow us to easily work through our multivariate time series evaluations.
 
 ```{r load data}
 us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
@@ -45,7 +46,7 @@ ggplot(data = us, aes(x=date, y=hospitalizedCurrently))+
 
 ## Independent Variable Review
 
-When reviewing the variables and the scatter plot from our previous EDA we can see that there are some correlations that were expected, for example *currentHospitalizations* is correlated with the variables that refelct ICU and Ventilaor patients. These metrics wouldn't exist without hospitalizations. These variables also cannot help up predict hospitalizations because they after occurances. So we will actually be leveraing variables such as *positive increase* in order to see if there is some sort of correlation between hospitalized patients and the number of positive cases.
+When reviewing the variables and the scatter plot from our previous EDA we can see that there are some correlations that were expected, for example *currentHospitalizations* is correlated with the variables that reflect ICU and Ventilator patients. These metrics wouldn't exist without hospitalizations. These variables also cannot help up predict hospitalizations because they after occurrences. So, we will actually be leveraging variables such as *positive increase* in order to see if there is some sort of correlation between hospitalized patients and the number of positive cases.
 
 - Positive Increase Trend
 
@@ -58,21 +59,21 @@ ggplot(data = us, aes(x=date, y=positiveIncrease))+
 
 ## Multivariate MLR w/ Correlated Errors for Currently Hospitalized Patients
 ### Forecast Independent Variables: Increase Positive Cases
-1. Evaluation: Slowly dampening ACF and heavy wandering consistent with a (1-B) factor. As well as frequency peaks at 0 and .14. Consistent with (1-B) and seasonailty component of 7.
+1. Evaluation: Slowly dampening ACF and heavy wandering consistent with a (1-B) factor. As well as frequency peaks at 0 and .14. Consistent with (1-B) and seasonality component of 7.
 
 ```{r}
 #a
 plotts.sample.wge(us$positiveIncrease)
 ```
 
-2. Differencing Data: much more stationary data and have surfaced a seasonaly component = 7 seen on ACF peaks at 7, 14, 21
+2. Differencing Data: much more stationary data and have surfaced a seasonal component = 7 seen on ACF peaks at 7, 14, 21
 
 ```{r}
 #b
 inpos.diff = artrans.wge(us$positiveIncrease, phi.tr = 1, lag.max = 100)
 ```
 
-3. Seaonality Transformation: stationary data, and an ACF that reflects data other than whitenoise to be modeled.
+3. Seasonality Transformation: stationary data, and an ACF that reflects data other than white noise to be modeled.
     
 ```{r}
 #c
@@ -87,7 +88,7 @@ aic5.wge(inpos.diff.seas)
 aic5.wge(inpos.diff.seas, type = "bic")
 ```
 
-5. White Noise Test: Reject the H_null and accept this data is not white noise
+5. White Noise Test
     
 ```{r}
 #e
@@ -95,7 +96,7 @@ acf(inpos.diff.seas)
 ljung.wge(inpos.diff.seas)$pval
 ```
 
-6. Estiamte Phis, Thetas
+6. Estimate Phis, Thetas
 7. Model Building
 
 ```{r}
@@ -136,7 +137,7 @@ lines(seq(188, 277,1), inpos.preds90$f, type = "l", col = "red")
 ```
 
 ### Forecast Dependent Variable: MLR w/ Correlated Errors for Currently Hospitalized Patients using Positive Increase
-1. Data prep and recognizing differencing and seaonal components of Currently Hospitalized
+1. Data prep and recognizing differencing and seasonal components of Currently Hospitalized
 
 ```{r}
 #Selecting only those dates with reported current hospitilizations
@@ -175,11 +176,11 @@ mlr.phis= aic.wge(mlr.fit$residuals)
 mlr.phis
 ```
 
-4. Now forcast with arima function with phi's from above coefficients and ARMA(1,2) model, 
+4. Now forecast with ARIMA function with phi's from above coefficients and ARMA(1,2) model, 
 
 ```{r}
 mlr.fit.arima = arima(us$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = us$positiveIncrease)
-AIC(mlr.fit.arima)
+#AIC(mlr.fit.arima)
 ```
 
 5. Run test to see if data is white noise: confirmed white noise, continue forward
@@ -238,9 +239,44 @@ plot(seq(1,132,1), us$hospitalizedCurrently, type = "l",  xlim = c(0,223), ylim 
 lines(seq(133,222,1), mlr1.preds90$pred, type = "l", col = "red")
 ```
 
-9. Windowed ASE
+9. ASE
+  - 7-Day: 631,469.8
 
 ```{r}
+mlr.train7 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:125], positiveIncrease = us$positiveIncrease[1:125])
+mlr.test7 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[126:132], positiveIncrease = us$positiveIncrease[126:132])
+
+fit7 = arima(mlr.train7$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = mlr.train7$positiveIncrease)
+fit7
+
+next7 = data.frame(positiveIncrease = mlr.test7$positiveIncrease)
+next7
+
+mlr.7.preds = predict(fit7, newxreg = next7, n.ahead = 7)
+mlr.7.preds
+
+ASEmlr7 = mean((mlr.test7$hospitalizedCurrently - mlr.7.preds$pred)^2)
+ASEmlr7
+```
+
+  - 90-Day: 567,209,810
+  - It would not be a statistically sound decision to run an ASE for a 90 day forecast. The data set would be trained on 20% of the data and tested on 80% of the data. This is the exact opposite of modeling a statistically sound time series for prediction. For our COVID predictions of severity we will advise to only to produce forecasts and ASE with 7-day forecasts but have produced the ASE for reference below.
+
+```{r}
+mlr.train90 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:42], positiveIncrease = us$positiveIncrease[1:42])
+mlr.test90 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[43:132], positiveIncrease = us$positiveIncrease[43:132])
+
+fit90 = arima(mlr.train90$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = mlr.train90$positiveIncrease)
+fit90
+
+next90 = data.frame(positiveIncrease = mlr.test90$positiveIncrease)
+invisible(next90)
+
+mlr.90.preds = predict(fit90, newxreg = next90, n.ahead = 90)
+invisible(mlr.90.preds)
+
+ASEmlr90 = mean((us$hospitalizedCurrently[43:132]-mlr.90.preds$pred)^2)
+ASEmlr90
 ```
 
 ### Forecast Dependent Variable: MLR w/ Correlated Errors for Currently Hospitalized Patients w/ Positive Increase & Trend
@@ -258,19 +294,19 @@ plot(mlr.fit.t$residuals)
 ```
 
 3. Diagnose with aic.wge and see what the p, q would be with residuals from above model
-    a. Below we can see that our aic.wge function has selected an ARMA(5,2) model for modeling our cmort information.
+  - Below we can see that our aic.wge function has selected an ARMA(5,2) model for modeling our currently hospitalized information.
 
 ```{r}
 mlr.phis= aic.wge(mlr.fit.t$residuals)
 mlr.phis
 ```
 
-4. Now forcast with arima function with phi's from above coefficients and ARMA(1,2) model, 
+4. Now forecast with arima function with phi's from above coefficients and ARMA(1,2) model.
 
 ```{r}
 Time <- seq(1,132,1)
 mlr.fit.arima.t = arima(us$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = cbind(us$positiveIncrease, Time))
-AIC(mlr.fit.arima.t)
+#AIC(mlr.fit.arima.t)
 ```
 
 5. Run test to see if data is white noise; confirmed white noise continue forward.
@@ -284,13 +320,16 @@ ltest2$pval
 ```
 
 6. Load the forecasted increase positive in a data frame
-    a. 7 Day
+  - 7 Day
+    
 ```{r}
 #7 Day Case Increase
 regs7t = data.frame(cbind(positiveIncrease = inpos.preds7$f, Time = seq(133,139)))
 invisible(regs7)
 ```
-    b. 90 Day
+
+  - 90 Day
+    
 ```{r}
 #90 Day Case Increase
 regs90t = data.frame(cbind(positiveIncrease = inpos.preds90$f, Time = seq(133,222)))
@@ -298,99 +337,84 @@ invisible(regs90)
 ```
 
 7. Predictions
-    a. 7 Day
+  - 7 Day
+    
 ```{r}
 mlr1.preds7.t = predict(mlr.fit.arima.t, newxreg = regs7t, n.ahead = 7)
 invisible(mlr1.preds7.t)
 ```
-    b. 90 Day
+
+  - 90 Day
+    
 ```{r}
 mlr1.preds90.t = predict(mlr.fit.arima.t, newxreg = regs90t, n.ahead =90)
 invisible(mlr1.preds90.t)
 ```
 
 8. Plotted Forecasts
-    a. 7 Day
+- 7 Day
+
 ```{r}
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l",  xlim = c(0,140), ylim = c(0,60000), ylab = "Currently Hospitalized COVID Cases", main = "7 Day Forecast for COVID Hospitalized Cases")
 lines(seq(133,139,1), mlr1.preds7.t$pred, type = "l", col = "red")
 ```
-    b. 90 Day
+
+  - 90 Day
+
 ```{r}
 plot(seq(1,132,1), us$hospitalizedCurrently, type = "l",  xlim = c(0,223), ylim = c(0,85000), ylab = "Currently Hospitalized COVID Cases", main = "90 Day Forecast for COVID Hospitalized Cases")
 lines(seq(133,222,1), mlr1.preds90.t$pred, type = "l", col = "red")
 ```
 
-9. Windowed ASE
-  a. 7 Day: 369,785,216
-```{r fig.show="hide", warning=FALSE}
-phis = mlr.phis$phi
-thetas = mlr.phis$theta
-
-trainingSize = 20
-horizon = 7
-ASEHolder = numeric()
-
-for( i in 1:(124-(trainingSize + horizon) + 1))
-{
-  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
-  
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - mlr1.preds7.t$pred)^2)
-         
-  ASEHolder[i] = ASE
-}
-```
+9. ASE
+  - 7-Day: 1,449,565
 
 ```{r}
-ASEHolder
-hist(ASEHolder)
-WindowedASE = mean(ASEHolder)
+mlr.t.train7 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:125], positiveIncrease = us$positiveIncrease[1:125])
+mlr.t.test7 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[126:132], positiveIncrease = us$positiveIncrease[126:132])
+
+fit.t7 = arima(mlr.t.train7$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = cbind(mlr.t.train7$positiveIncrease, Time[1:125]))
+fit.t7
+
+next.t7 = data.frame(positiveIncrease = mlr.t.test7$positiveIncrease, Time = Time[126:132])
+next.t7
+
+mlr.t.7.preds = predict(fit.t7, newxreg = next.t7, n.ahead = 7)
+mlr.t.7.preds
+
+ASEmlr7 = mean((mlr.t.test7$hospitalizedCurrently - mlr.t.7.preds$pred)^2)
+ASEmlr7
 ```
+
+  - 90-Day: 2,867,623,021
+  - It would not be a statistically sound decision to run an ASE for a 90 day forecast. The data set would be trained on 20% of the data and tested on 80% of the data. This is the exact opposite of modeling a statistically sound time series for prediction. For our COVID predictions of severity we will advise to only to produce forecasts and ASE with 7-day forecasts but have produced the ASE for reference below.
 
 ```{r}
-summary(ASEHolder)
-WindowedASE
-```
+mlr.t.train90 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:42], positiveIncrease = us$positiveIncrease[1:42])
+mlr.t.test90 <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[43:132], positiveIncrease = us$positiveIncrease[43:132])
 
-  b. 90 Day: 1,054,226,906
-```{r fig.show="hide", warning=FALSE}
-phis = mlr.phis$phi
-thetas = mlr.phis$theta
+fit.t90 = arima(mlr.t.train90$hospitalizedCurrently, order = c(5,1,2), seasonal = list(order = c(1,0,0), period = 7), xreg = cbind(mlr.t.train90$positiveIncrease, Time[1:42]))
+fit.t90
 
-trainingSize = 20
-horizon = 90
-ASEHolder = numeric()
+next.t90 = data.frame(positiveIncrease = mlr.t.test90$positiveIncrease, Time = Time[43:132])
+invisible(next.t90)
 
-for( i in 1:(124-(trainingSize + horizon) + 1))
-{
-  forecasts = fore.aruma.wge(us$hospitalizedCurrently[i:(i+(trainingSize-1))],phi = phis, theta = thetas, s = 7, d = 1,n.ahead = horizon)
-  
-  ASE = mean((us$hospitalizedCurrently[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - mlr1.preds90.t$pred)^2)
-         
-  ASEHolder[i] = ASE
-}
-```
+mlr.t.90.preds = predict(fit.t90, newxreg = next.t90, n.ahead = 90)
+invisible(mlr.t.90.preds)
 
-```{r}
-ASEHolder
-hist(ASEHolder)
-WindowedASE = mean(ASEHolder)
-```
-
-```{r}
-summary(ASEHolder)
-WindowedASE
+ASEmlr90 = mean((mlr.t.test90$hospitalizedCurrently - mlr.t.90.preds$pred)^2)
+ASEmlr90
 ```
 
 ### Forecast Dependent Variable: MLR w/ Correlated Errors (lagged variables) for Currently Hospitalized Patients w/ Positive Increase & Trend
-With a quick check, we can see that there is no lag correlationed between the increase of COVID patients and hospitalized patients, like we theorized there might be. So we will not model an MLR w/ correlated errors on lagged variables.
+With a quick check, we can see that there is no lag correlation between the increase of COVID patients and hospitalized patients, like we theorized there might be. So we will not model an MLR w/ correlated errors on lagged variables.
 
 ```{r}
 ccf(us$positiveIncrease,us$hospitalizedCurrently)
 ```
 
 ## Multivariate VAR Model
-Since we are working with a seasonal and transformation component but it requires an additional transformation for the total positive COVID cases to become stationary for evaluation, we will only use positive increase of cases to predict currently hospitzliaed cases for the VAR model.
+Since we are working with a seasonal and transformation component, but it requires an additional transformation for the total positive COVID cases to become stationary for evaluation, we will only use positive increase of cases to predict currently hospitalized cases for the VAR model.
 
 1. Differenced and Seasonal Transformation VAR Model
 
@@ -407,109 +431,117 @@ us.diff = artrans.wge(us$hospitalizedCurrently, phi.tr = 1, lag.max = 100)
 currhosp.trans = artrans.wge(us.diff,phi.tr = c(0,0,0,0,0,0,1), lag.max = 100)
 ```
 
-2. Use Var select to find best model and fit model: p = 8 for lowest AIC
+2. Use VAR select to find best model and fit model: p = 8 for lowest AIC
 
 ```{r}
 #VARselect to choose lag
 VARselect(cbind(currhosp.trans, inpos.trans), lag.max = 10, type= "both")
 #fit model
 usdiff.var.fit = VAR(cbind(currhosp.trans, inpos.trans), type = "both", p = 2)
+#AIC: 30.51427
 ```
 
 3. Predictions for Difference
-    a. 7 Day
+  - 7 Day
 ```{r}
 #7 day predictions
 pred.var7 = predict(usdiff.var.fit, n.ahead = 7)
-pred.var7$fcst$currhosp.trans
+pred.var7$fcst$currhosp.trans[,1:3]
 ```
-    b. 90 Day
+  - 90 Day
 ```{r}
 #90 day predictions
 pred.var90 = predict(usdiff.var.fit, n.ahead = 90)
-pred.var90$fcst$currhosp.trans
+invisible(pred.var90$fcst$currhosp.trans)
 ```
 
 4. Calculate Actual Forecasts from Predicted Differences
-    a. 7 Day
+  - 7 Day
 ```{r}
 startingPoints7 = us$hospitalizedCurrently[126:132]
 currHospForecasts7 = pred.var7$fcst$currhosp.trans[,1:3] + startingPoints7
 ```
-    b. 90 Day
+  - 90 Day
 ```{r}
 startingPoints90 = us$hospitalizedCurrently[43:132]
 currHospForecasts90 = pred.var90$fcst$currhosp.trans[,1:3] + startingPoints90
 ```
 
 5. Plotting Forecasts
-    a. 7 Day
+  - 7 Day
 ```{r}
 #7 day Forecasts
-plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,139), ylab = "Currently Hospitalized COVID Patients", main = "7 Day Currently Hospitalized Patients Forecast")
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,139), ylim = c(0,62000), ylab = "Currently Hospitalized COVID Patients", main = "7 Day Currently Hospitalized Patients Forecast")
 lines(seq(133,139,1), as.data.frame(currHospForecasts7)$fcst, type = "l", col = "red")
+lines(seq(133,139,1), as.data.frame(currHospForecasts7)$upper, type = "l", col = "blue")
+lines(seq(133,139,1), as.data.frame(currHospForecasts7)$lower, type = "l", col = "blue")
 ```
-    b. 90 Day
+  - 90 Day
 ```{r}
 #90 day Forecasts
-plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,222), ylab = "Currently Hospitalized COVID Patients", main = "90 Day Currently Hospitalized Patients Forecast")
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,222), ylim = c(0,62000), ylab = "Currently Hospitalized COVID Patients", main = "90 Day Currently Hospitalized Patients Forecast")
 lines(seq(133,222,1), as.data.frame(currHospForecasts90)$fcst, type = "l", col = "red")
+lines(seq(133,222,1), as.data.frame(currHospForecasts90)$upper, type = "l", col = "blue")
+lines(seq(133,222,1), as.data.frame(currHospForecasts90)$lower, type = "l", col = "blue")
 ```
 
-5. Calculate ASE
-# *WHERE YOU LEFT OFF*
+5. ASE
+  - 7-Day
 ```{r}
-#varASE = mean((us$hospitalizedCurrently[123:132]-pred.var$fcst$y1[1:10])^2)
-#varASE
+varASE7 = mean((us$hospitalizedCurrently[126:132]-currHospForecasts7[1:7])^2)
+varASE7
 ```
 
-6. Windowed ASE
+  - 90-Day
+  - It would not be a statistically sound decision to run an ASE for a 90 day forecast. The data set would be trained on 20% of the data and tested on 80% of the data. This is the exact opposite of modeling a statistically sound time series for prediction. For our COVID predictions of severity we will advise to only to produce forecasts and ASE with 7-day forecasts but have produced the ASE for reference below.
 
 ```{r}
-
+varASE7 = mean((us$hospitalizedCurrently[43:132]-currHospForecasts90[1:90])^2)
+varASE7
 ```
 
-#### Multilayer Perceptron Model (MLP) / NN
-Since we have been looking at additional regressors for all our above models and know that the best regressor to leverage will be positive increase of COVID cases. This regressor reflects similar behavior to that of current hospitlizations and can be model properly against hospitalizations.
+#### Multilayer Perceptron (MLP) / Neural Network Model
+Since we have been looking at additional regressors for all our above models and know that the best regressor to leverage will be positive increase of COVID cases. This regressor reflects similar behavior to that of current hospitalizations and can be model properly against hospitalizations.
 1. Create Current Hospitalized ts variable
 
 ```{r}
 tUScurrhop = ts(us$hospitalizedCurrently)
 ```
 
-2. Create data frame of regressor: positive increase covid cases variable
+2. Create data frame of regressor: positive increase COVID cases variable
 
 ```{r}
 tUSx = data.frame(positiveIncrease = ts(us$positiveIncrease))
 ```
 
 3. Forecast of positive increase of COVID cases
-    a. 7 Day Forecast for Regressor
+  - 7 Day Forecast for Regressor
 
 ```{r}
 fit.mlp.new = mlp(ts(tUSx), reps = 50, comb = "mean")
 mlp.new.fore7 = forecast(fit.mlp.new, h = 7)
-mlp.new.fore7
+invisible(mlp.new.fore7)
 ```
-    b. 90 Day Forecast for Regressor
+
+  - 90 Day Forecast for Regressor
 
 ```{r}
 mlp.new.fore90 = forecast(fit.mlp.new, h = 90)
-mlp.new.fore90
+invisible(mlp.new.fore90)
 ```
 
 4. Combine observed new cases + forecast new cases
-    a. 7 Day regressor var
+  - 7 Day regressor var
 
 ```{r}
 new.regressor7 <- data.frame(c(us$positiveIncrease, mlp.new.fore7$mean))
-new.regressor7 
+invisible(new.regressor7)
 ```
-    b. 90 day regressor var
+  - 90 day regressor var
 
 ```{r}
 new.regressor90 <- data.frame(c(us$positiveIncrease, mlp.new.fore90$mean))
-new.regressor90
+invisible(new.regressor90)
 ```
 
 5. Fit model for currently hospitalized w/ regressor of new cases
@@ -520,31 +552,68 @@ plot(mlp.fit1)
 ```
 
 4. Forecast w/ known Positive Increase Case Variable
-    a. Currently Hospitalized 7 Day Forecast w/ Positive Increaser Regressor
+  - Currently Hospitalized 7 Day Forecast w/ Positive Increase Regressor
 
 ```{r}
 currhosp.fore7 = forecast(mlp.fit1, h = 7, xreg = new.regressor7)
 plot(currhosp.fore7)
 ```
-    b. Currently Hospitalized 90 Day Forecast w/ Positive Increaser Regressor
+  - Currently Hospitalized 90 Day Forecast w/ Positive Increase Regressor
 
 ```{r}
 currhosp.fore90 = forecast(mlp.fit1, h = 90, xreg = new.regressor90)
 plot(currhosp.fore90)
 ```
 
-5. Simple ASE
+5. ASE
+  - 7-Day
+  
+```{r}
+#ASEmlr7 = mean((us$hospitalizedCurrently[126:132]-currhosp.fore7$mean)^2)
+#ASEmlr7
+
+tUScurrhop2 = ts(us$hospitalizedCurrently[1:125])
+tUSx2 = data.frame(positiveIncrease = ts(us$positiveIncrease[1:125]))
+fit.mlp.new2 = mlp(ts(tUSx2), reps = 50, comb = "mean")
+mlp.new.fore7.2 = forecast(fit.mlp.new2, h = 7)
+invisible(mlp.new.fore7.2)
+new.regressor7.2 <- data.frame(c(us$positiveIncrease[1:125], mlp.new.fore7.2$mean))
+invisible(new.regressor7.2)
+mlp.fit1.2 = mlp(tUScurrhop2, xreg = tUSx2, comb = "mean")
+#plot(mlp.fit1.2)
+currhosp.fore7.2 = forecast(mlp.fit1.2, h = 7, xreg = new.regressor7.2)
+#plot(currhosp.fore7.2)
+ASEmlr7.2 = mean((us$hospitalizedCurrently[126:132]-currhosp.fore7.2$mean)^2)
+ASEmlr7.2
+```
+
+  - 90-Day
+  - It would not be a statistically sound decision to run an ASE for a 90 day forecast. The data set would be trained on 20% of the data and tested on 80% of the data. This is the exact opposite of modeling a statistically sound time series for prediction. For our COVID predictions of severity we will advise to only to produce forecasts and ASE with 7-day forecasts but have produced the ASE for reference below.
 
 ```{r}
-ASEmlr = mean((us$hospitalizedCurrently[126:132]-currhosp.fore7$mean)^2)
-ASEmlr
+#ASEmlr90 = mean((us$hospitalizedCurrently[43:132]-currhosp.fore90$mean)^2)
+#ASEmlr90
+
+tUScurrhop3 = ts(us$hospitalizedCurrently[1:42])
+tUSx3 = data.frame(positiveIncrease = ts(us$positiveIncrease[1:42]))
+fit.mlp.new3 = mlp(ts(tUSx3), reps = 50, comb = "mean")
+mlp.new.fore7.3 = forecast(fit.mlp.new3, h = 90)
+invisible(mlp.new.fore7.3)
+new.regressor7.3 <- data.frame(c(us$positiveIncrease[1:42], mlp.new.fore7.3$mean))
+invisible(new.regressor7.3)
+mlp.fit1.3 = mlp(tUScurrhop3, xreg = tUSx2, comb = "mean")
+#plot(mlp.fit1.3)
+currhosp.fore7.3 = forecast(mlp.fit1.3, h = 90, xreg = new.regressor7.3)
+#plot(currhosp.fore7.3)
+ASEmlr7.3 = mean((us$hospitalizedCurrently[43:132]-currhosp.fore7.3$mean)^2)
+ASEmlr7.3
 ```
 
 ### MLP NN Model Analysis
-We completed a default neural network model. With so many opportunities for how to actually tune neural network model we knew this would not be our best model in this case. So we moved forward with a hypertuned neural network model that allows us to calculate many windowed ASEs and compare those model against eachother.
+We completed a default neural network model. With so many opportunities for how to actually tune neural network model we knew this would not be our best model in this case. So we moved forward with a hyper tuned neural network model that allows us to calculate many windowed ASEs and compare those model against each other.
 
-## Ensemble Model / Hypertuned NN Model
-We have leveraged the tswgewrapper code above to produce a hyperparameter tuned NN model for our ensemble model. This model will work as our higher functioning ensemble model. Below are the steps to surface the best hyperparameters based on our grid search
+## Ensemble Model: Hyper Tuned Neural Network Model
+We have leveraged the tswgewrapper code above to produce a hyperparameter tuned NN model for our ensemble model. This model will work as our higher functioning ensemble 
 
 ```{r}
 #if (!require(devtools)) {
@@ -615,7 +684,7 @@ plot(caret_model.m$finalModel)
 ```
 
 6. Forecasts
-  - Model final with best hyper parameters from above and regressor of positive increaser of COVID cases.
+  - Model final with best hyper parameters from above and regressor of positive increase of COVID cases.
 
 ```{r}
 #Ensemble model
@@ -641,3 +710,82 @@ plot(fore7.m)
 fore90.m = forecast(ensemble.mlp, xreg = new.regressor90, h=90)
 plot(fore90.m)
 ```
+
+7. ASE
+  - 7-Day
+```{r}
+ASEmlr7 = mean((us$hospitalizedCurrently[126:132]-fore7.m$mean)^2)
+ASEmlr7
+```
+
+  - 90-Day
+  - It would not be a statistically sound decision to run an ASE for a 90-day forecast. The data set would be trained on 20% of the data and tested on 80% of the data. This is the exact opposite of modeling a statistically sound time series for prediction. For our COVID predictions of severity we will advise to only to produce forecasts and ASE with 7-day forecasts. This point is proven by the extremely high ASE calculated below. 
+
+```{r}
+ASEmlr90 = mean((us$hospitalizedCurrently[43:132]-fore90.m$mean)^2)
+ASEmlr90
+```
+
+## Multivariate Model Analysis
+We started our multivariate analysis using multiple regression with correlated errors models. We ended up producing two models, one with and without a trend. We predicted that a trend (or time) would be a deciding variable in which of these models would be outperform the other. However, we expected trend to be the better model. When we compared the two via their AICs, we found the MLR model without trend performed better both with an AIC and when we compared the ASEs between the two model types. When applying our domain knowledge, we did come to the conclusion that time would not necessarily be a strong determinant for the severity of COVID since we have yet to observe, and subsequently able to analyze, a full cycle of the virus effect on the US population. Once we are able to analyze data to this level, we would expect a time correlation and therefore lag/trend model performing better in the predictions of the virus’s severity and therefore hospitalized patients.
+
+Next we completed a Vector AR (VAR) model analysis of our data. This modeling processes requires the data of both the independent and dependent variables to be stationary. Which means we are actually modeling on the residuals of the data. This also results in the predictions/forecasts being based on differences of the forecasts and therefore the forecasts have to be calculated based on the previous periods values. This modeling techniques is highly sensitive to the previously observed values, which in the case of COVID is essential for understanding the severity of COVID. Since we have yet to observe a full cycle the modeling for predicting hospitalized cases should be closely based on what we’ve previously observed. So far this is the better of the three models we’ve produced. 
+
+For our final 2 models we performed multilayered perceptron or neural network model. For our first model we used a mostly default hyper parameters for the model. The ASEs returned with cross validation are much higher than the VAR model. We see it in the billions for the 90-day window forecast. This is as expected since the NN model creates multiple scenarios and takes the average of those in order to forecast moving forward. This means even the highest and lowest are incorporated into the forecast. While some of the scenarios are not statistically likely the NN model is attempting to create a forecast that takes these possibilities into account. In order to help created a better neural network we created a hyper parameter turned model. This model produced ASEs much lower than then default parameter neural network model. The forecasts for the hyper tuned NN model are slightly less dispersed than the default NN model telling us that these predictions are more helpful. Hyper tuning the additional parameters allows the model to be closer in predicting future hospitalized cases. We performed windowed ASEs in order to pick the best hyper tuned parameters for our advanced neural network model.
+
+Upon reviewing our 90-day forecasts and ASEs we have concluded it would not be a statistically sound decision to run a 90-day forecast and allow it to make long term decisions until we have more data. Upon performing 90-day forecasts we end up having to train the model on 20% of the data and test it on 80% of the data. This is the exact opposite of modeling a statistically sound time series for prediction. For our COVID predictions of severity we will advise to only to produce forecasts and ASE with 7-day forecasts but have produced the ASE for reference below. This applies to all of our model’s cross validation efforts and ASE calculations.
+
+We have chosen two models to help us predict severity with the COVID hospitalized. We will leverage the vector AR model for short term forecasts This model allows us to base our predictions off of previously observed values. Since COVID has not completed a full cycle and has shown heavy wandering behavior in the realization, we feel using this method will be the closest in order to get us prepared for forecasts for our 7-day and doing short term planning for the hospitalizes supplies and staffing.
+
+For our long term forecasting we have chosen to go with our hyper tuned parameter neural network model. This model is the most helpful for long term forecasting because it has the ability to adjust and reapply the most effective model based on the newest data input with daily updates. The parameter turned neural network model takes into account multiple possibilities and therefore does give us the most statistically useful forecast for our 90-day period. It is essential that both of these models be updated daily. COVID cases and hospitalizations changes frequently and the only way to continue to forecast and prepare effectively is to have updated models with as much data as possible. 
+
+```{r}
+#VAR 7-Day Forecasts w/ Prediction Intervals
+plot(seq(1,132,1), us$hospitalizedCurrently, type = "l", xlim = c(0,139), ylim = c(0,62000), ylab = "Currently Hospitalized COVID Patients", main = "7 Day Currently Hospitalized Patients Forecast")
+lines(seq(133,139,1), as.data.frame(currHospForecasts7)$fcst, type = "l", col = "red")
+lines(seq(133,139,1), as.data.frame(currHospForecasts7)$upper, type = "l", col = "blue")
+lines(seq(133,139,1), as.data.frame(currHospForecasts7)$lower, type = "l", col = "blue")
+```
+
+```{r}
+#Hyper Tuned Parameter Neural Network Model Forecast w/ Prediction Intervals
+fore90.m = forecast(ensemble.mlp, xreg = new.regressor90, h=90, )
+plot(fore90.m)
+```
+
+## Multivariate Model Performance Breakdown
+### Multiple Regression w/ Correlated Errors w/o Trend
+- AIC: 2184.712
+- 7-Day ASE
+  - 631,469.8
+
+- 90-Day ASE
+  - 567,209,810
+
+### Multiple Regression w/ Correlated Errors w/ Trend
+AIC: 2186.678
+- 7-Day ASE
+  - 1,449,565
+
+- 90-Day ASE
+   - 2,867,623,021
+
+### Vector AR Model 
+- 7-Day ASE
+  - 25,178.55
+- 90-Day ASE
+  - 10,791.59
+
+### Multilayered Perceptron / Neural Network Model
+- 7-Day ASE
+  - 4,068,222
+- 90-Day ASE
+  - 17,516,230,847
+
+### Ensemble Model: Hyper Tuned Neural Network Model
+- 7-Day ASE
+  - 2,126,994
+- 90-Day ASE
+  - 2,239,014,808
+- 7-Day Windowed ASE
+  - 13,970,241
