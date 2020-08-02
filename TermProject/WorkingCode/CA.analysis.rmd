@@ -910,7 +910,7 @@ fq <- fore.arma.wge(Totalhosp, phi = Hosp_estq$phi, theta = Hosp_estq$theta, n.a
 ```
 
 
-90 Day Forecast with MLR Model
+7 Day Forecast with MLR Model
 
 ```{r}
 plot(seq(1,108,1), Totalhosp1, type = "l",xlim = c(0,115),ylim=c(4000,9000), xlab="days", ylab = "COVID-Related Hospitalized Patients", main = "7 Day Forecast - Linear Regression with Corr Errors Model")
