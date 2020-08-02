@@ -464,17 +464,6 @@ After using the tool to tune the hyperparameters, the forecast produced from the
 
 Again, it is essentially impossible to say which model is "better" because our expectations for the future do not necessarily represent the past behavior of the data. Without some form of biased input, generated models are not going to take into account what we expect to happen in long term. For a short term model, the mlp had the lowest ASE so we could call that the "best" based on that metric.
 
-ASE of tuned MLP model
-
-```{r}
-mlp_uni2_90_t <- mlp(ts(Totalhosp_ts[1:112]), reps = 16, hd = 1, allow.det.season = FALSE)
-fore_mlp_uni2_7_t <- forecast(mlp_uni2_90_t , h=7) #univariate 7 day mlp forecast
-
-#Calculate ASE
-ASE = mean((Totalhosp[113:119] - fore_mlp_uni2_7_t$mean)^2)
-ASE
-```
-
 
 
 
