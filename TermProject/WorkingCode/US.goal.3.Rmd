@@ -759,35 +759,34 @@ plot(fore90.m)
 #### Multiple Regression w/ Correlated Errors w/o Trend
 - AIC: 2184.712
 - 7-Day ASE
-  - 631,469.8
+    - 631,469.8
 
 - 90-Day ASE
-  - 567,209,810
+    - 567,209,810
 
 #### Multiple Regression w/ Correlated Errors w/ Trend
-AIC: 2186.678
+- AIC: 2186.678
 - 7-Day ASE
-  - 1,449,565
-
+    - 1,449,565
 - 90-Day ASE
-   - 2,867,623,021
+    - 2,867,623,021
 
 #### Vector AR Model 
 - 7-Day ASE
-  - 25,178.55
+    - 25,178.55
 - 90-Day ASE
-  - 10,791.59
+    - 10,791.59
 
 #### Multilayered Perceptron / Neural Network Model
 - 7-Day ASE
-  - 4,068,222
+    - 4,068,222
 - 90-Day ASE
-  - 17,516,230,847
+    - 17,516,230,847
 
 #### Ensemble Model: Hyper Tuned Neural Network Model
 - 7-Day ASE
-  - 2,126,994
+    - 2,126,994
 - 90-Day ASE
-  - 2,239,014,808
+    - 2,239,014,808
 - 7-Day Windowed ASE
-  - 13,970,241
+    - 13,970,241
