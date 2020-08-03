@@ -14,9 +14,9 @@ library(nnfor)
 library(tswge)
 ```
 
-# US COVID Data
+## Goal 3: US COVID Data
 
-## Data Prep
+### Data Prep
 In order to prep our data from our EDA we will load, transform the date, remove all zero row from the variable we are testing *hospitalizedCurrently*, and sort from oldest to newest. This will allow us to easily work through our multivariate time series evaluations.
 
 ```{r load data}
@@ -28,10 +28,10 @@ us = us[order(as.Date(us$date, format = "%Y%m%d")),]
 head(us)
 ```
 
-## Stationarity: Current Hospitalizations
+### Stationarity: Current Hospitalizations
 It is difficult to assume stationarity for this data due to multiple factors. We are working under the assumption that COVID is a novel virus and cases as well as hospitalizations will eventually return to zero. This being said our current modeling techniques do things such as return to the median or mimic the previously seen trends. Also, we see a heavy wandering trend in both new cases and hospitalization would be dependent on this as well as time. We will review the data and see what, if any, non-stationary components reveal themselves and model the data accordingly.
 
-### Current Hospitalization Realization
+#### Current Hospitalization Realization
 Traits:
 
 - Heavy wandering behavior 
@@ -44,7 +44,7 @@ ggplot(data = us, aes(x=date, y=hospitalizedCurrently))+
     theme_fivethirtyeight()
 ```
 
-## Independent Variable Review
+### Independent Variable Review
 
 When reviewing the variables and the scatter plot from our previous EDA we can see that there are some correlations that were expected, for example *currentHospitalizations* is correlated with the variables that reflect ICU and Ventilator patients. These metrics wouldn't exist without hospitalizations. These variables also cannot help up predict hospitalizations because they after occurrences. So, we will actually be leveraging variables such as *positive increase* in order to see if there is some sort of correlation between hospitalized patients and the number of positive cases.
 
@@ -57,8 +57,8 @@ ggplot(data = us, aes(x=date, y=positiveIncrease))+
     theme_fivethirtyeight()
 ```
 
-## Multivariate MLR w/ Correlated Errors for Currently Hospitalized Patients
-### Forecast Independent Variables: Increase Positive Cases
+### Multivariate MLR w/ Correlated Errors for Currently Hospitalized Patients
+#### Forecast Independent Variables: Increase Positive Cases
 1. Evaluation: Slowly dampening ACF and heavy wandering consistent with a (1-B) factor. As well as frequency peaks at 0 and .14. Consistent with (1-B) and seasonality component of 7.
 
 ```{r}
@@ -136,7 +136,7 @@ plot(seq(1,187,1), us$positiveIncrease, type = "l", xlim = c(0,280), ylim = c(0,
 lines(seq(188, 277,1), inpos.preds90$f, type = "l", col = "red")
 ```
 
-### Forecast Dependent Variable: MLR w/ Correlated Errors for Currently Hospitalized Patients using Positive Increase
+#### Forecast Dependent Variable: MLR w/ Correlated Errors for Currently Hospitalized Patients using Positive Increase
 1. Data prep and recognizing differencing and seasonal components of Currently Hospitalized
 
 ```{r}
@@ -279,7 +279,7 @@ ASEmlr90 = mean((us$hospitalizedCurrently[43:132]-mlr.90.preds$pred)^2)
 ASEmlr90
 ```
 
-### Forecast Dependent Variable: MLR w/ Correlated Errors for Currently Hospitalized Patients w/ Positive Increase & Trend
+#### Forecast Dependent Variable: MLR w/ Correlated Errors for Currently Hospitalized Patients w/ Positive Increase & Trend
 1. Fit simple regression model predicting *hospitalizedCurrently* with *positiveIncrease* and trend
 
 ```{r}
@@ -406,14 +406,14 @@ ASEmlr90 = mean((mlr.t.test90$hospitalizedCurrently - mlr.t.90.preds$pred)^2)
 ASEmlr90
 ```
 
-### Forecast Dependent Variable: MLR w/ Correlated Errors (lagged variables) for Currently Hospitalized Patients w/ Positive Increase & Trend
+#### Forecast Dependent Variable: MLR w/ Correlated Errors (lagged variables) for Currently Hospitalized Patients w/ Positive Increase & Trend
 With a quick check, we can see that there is no lag correlation between the increase of COVID patients and hospitalized patients, like we theorized there might be. So we will not model an MLR w/ correlated errors on lagged variables.
 
 ```{r}
 ccf(us$positiveIncrease,us$hospitalizedCurrently)
 ```
 
-## Multivariate VAR Model
+### Multivariate VAR Model
 Since we are working with a seasonal and transformation component, but it requires an additional transformation for the total positive COVID cases to become stationary for evaluation, we will only use positive increase of cases to predict currently hospitalized cases for the VAR model.
 
 1. Differenced and Seasonal Transformation VAR Model
@@ -500,7 +500,7 @@ varASE7 = mean((us$hospitalizedCurrently[43:132]-currHospForecasts90[1:90])^2)
 varASE7
 ```
 
-#### Multilayer Perceptron (MLP) / Neural Network Model
+##### Multilayer Perceptron (MLP) / Neural Network Model
 Since we have been looking at additional regressors for all our above models and know that the best regressor to leverage will be positive increase of COVID cases. This regressor reflects similar behavior to that of current hospitalizations and can be model properly against hospitalizations.
 1. Create Current Hospitalized ts variable
 
@@ -609,10 +609,10 @@ ASEmlr7.3 = mean((us$hospitalizedCurrently[43:132]-currhosp.fore7.3$mean)^2)
 ASEmlr7.3
 ```
 
-### MLP NN Model Analysis
+#### MLP NN Model Analysis
 We completed a default neural network model. With so many opportunities for how to actually tune neural network model we knew this would not be our best model in this case. So we moved forward with a hyper tuned neural network model that allows us to calculate many windowed ASEs and compare those model against each other.
 
-## Ensemble Model: Hyper Tuned Neural Network Model
+### Ensemble Model: Hyper Tuned Neural Network Model
 We have leveraged the tswgewrapper code above to produce a hyperparameter tuned NN model for our ensemble model. This model will work as our higher functioning ensemble 
 
 ```{r}
@@ -726,7 +726,7 @@ ASEmlr90 = mean((us$hospitalizedCurrently[43:132]-fore90.m$mean)^2)
 ASEmlr90
 ```
 
-## Multivariate Model Analysis
+### Multivariate Model Analysis
 We started our multivariate analysis using multiple regression with correlated errors models. We ended up producing two models, one with and without a trend. We predicted that a trend (or time) would be a deciding variable in which of these models would be outperform the other. However, we expected trend to be the better model. When we compared the two via their AICs, we found the MLR model without trend performed better both with an AIC and when we compared the ASEs between the two model types. When applying our domain knowledge, we did come to the conclusion that time would not necessarily be a strong determinant for the severity of COVID since we have yet to observe, and subsequently able to analyze, a full cycle of the virus effect on the US population. Once we are able to analyze data to this level, we would expect a time correlation and therefore lag/trend model performing better in the predictions of the virus’s severity and therefore hospitalized patients.
 
 Next we completed a Vector AR (VAR) model analysis of our data. This modeling processes requires the data of both the independent and dependent variables to be stationary. Which means we are actually modeling on the residuals of the data. This also results in the predictions/forecasts being based on differences of the forecasts and therefore the forecasts have to be calculated based on the previous periods values. This modeling techniques is highly sensitive to the previously observed values, which in the case of COVID is essential for understanding the severity of COVID. Since we have yet to observe a full cycle the modeling for predicting hospitalized cases should be closely based on what we’ve previously observed. So far this is the better of the three models we’ve produced. 
@@ -755,8 +755,8 @@ fore90.m = forecast(ensemble.mlp, xreg = new.regressor90, h=90, )
 plot(fore90.m)
 ```
 
-## Multivariate Model Performance Breakdown
-### Multiple Regression w/ Correlated Errors w/o Trend
+### Multivariate Model Performance Breakdown
+#### Multiple Regression w/ Correlated Errors w/o Trend
 - AIC: 2184.712
 - 7-Day ASE
   - 631,469.8
@@ -764,7 +764,7 @@ plot(fore90.m)
 - 90-Day ASE
   - 567,209,810
 
-### Multiple Regression w/ Correlated Errors w/ Trend
+#### Multiple Regression w/ Correlated Errors w/ Trend
 AIC: 2186.678
 - 7-Day ASE
   - 1,449,565
@@ -772,19 +772,19 @@ AIC: 2186.678
 - 90-Day ASE
    - 2,867,623,021
 
-### Vector AR Model 
+#### Vector AR Model 
 - 7-Day ASE
   - 25,178.55
 - 90-Day ASE
   - 10,791.59
 
-### Multilayered Perceptron / Neural Network Model
+#### Multilayered Perceptron / Neural Network Model
 - 7-Day ASE
   - 4,068,222
 - 90-Day ASE
   - 17,516,230,847
 
-### Ensemble Model: Hyper Tuned Neural Network Model
+#### Ensemble Model: Hyper Tuned Neural Network Model
 - 7-Day ASE
   - 2,126,994
 - 90-Day ASE
