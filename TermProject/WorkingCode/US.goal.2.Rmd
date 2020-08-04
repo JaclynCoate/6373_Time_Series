@@ -12,7 +12,7 @@ library(ggplot2)
 library(ggthemes)
 ```
 
-# US COVID Data
+# Goal 2: US COVID Data
 
 ### Data Prep
 In order to prep our data from our EDA we will load, transform the date, remove all zero row from the variable we are testing *hospitalizedCurrently*, and sort from oldest to newet. This will allow us to easily work through our univariate time series evaluations.
@@ -394,6 +394,7 @@ library(tswgewrapped)
 1. Train / Test Data Sets
 
 ```{r}
+set.seed(3)
 data_train.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:122], positiveIncrease = rnorm(122, 0, .0001))
 data_test.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[123:132], positiveIncrease = rnorm(10, 0, .0001))
 ```
@@ -420,14 +421,13 @@ res.u
 model.u$plot_hyperparam_results()
 ```
 
-4. Best Parameters shown in below table. The best hyperparameters based on this grid search are 16 repetitions and 1 hidden layer, and allow.det.season = FALSE.
+4. Best Parameters shown in below table. The best hyperparameters based on this grid search are listed below
 
 ```{r}
 best.u <- model.u$summarize_best_hyperparams()
-best.u
 ```
 
-5. Windowed ASE of 12,177,586.
+5. Windowed ASE is below.
 
 ```{r}
 final.ase.u <- dplyr::filter(res.u, reps == best.u$reps &
@@ -455,7 +455,7 @@ plot(caret_model.u$finalModel)
 
 ```{r}
 #Ensemble model trained data
-ensemble.mlp.u1 = nnfor::mlp(usTrain.nn, outplot = T, reps = 16, hd = 1, allow.det.season = F)
+ensemble.mlp.u1 = nnfor::mlp(usTrain.nn, outplot = T, reps = best.u$reps, hd = best.u$hd, allow.det.season = F)
 ensemble.mlp.u1
 ```
 
@@ -463,7 +463,7 @@ ensemble.mlp.u1
 
 ```{r}
 #Ensemble model
-ensemble.mlp.u2 = nnfor::mlp(ts(us$hospitalizedCurrently), outplot = T, reps = 16, hd = 1, allow.det.season = F)
+ensemble.mlp.u2 = nnfor::mlp(ts(us$hospitalizedCurrently), outplot = T, reps = best.u$reps, hd = best.u$hd, allow.det.season = F)
 ensemble.mlp.u2
 ```
 
@@ -472,7 +472,21 @@ ensemble.mlp.u2
 
 ```{r}
 fore7.1.u = forecast(ensemble.mlp.u1 , h=7)
+```
+
+```{r}
+#grabbing prediction intervals for 7 day forecast
+all.mean7 <- data.frame(fore7.1.u$all.mean)
+ranges7 <- data.frame(apply(all.mean7, MARGIN = 1, FUN = range))
+subtracts7 <- ranges7 - as.list(ranges7[1,])
+nintyperc7 <- data.frame(mapply(`*`,subtracts7,.9,SIMPLIFY=FALSE))
+diffs7 <- data.frame(mapply(`/`,nintyperc7,2,SIMPLIFY = FALSE))
+diffs7 = diffs7[-1,]
+vector7 <-  as.numeric(diffs7[1,])
+
 plot(fore7.1.u)
+lines(seq(126,132,1), (fore7.1.u$mean + vector7), type = "l", col = "red")
+lines(seq(126,132,1), (fore7.1.u$mean - vector7), type = "l", col = "red")
 ```
 
   b. Next we forecasted the 7-day for our full data set. We see a much strong downward trend in our 7 day forecast.
@@ -487,7 +501,21 @@ plot(fore7.2.u)
 
 ```{r}
 fore90.1.u = forecast(ensemble.mlp.u1, h=90)
+```
+
+```{r}
+#grabbing prediction intervals for 90 day forecast
+all.mean90 <- data.frame(fore90.1.u$all.mean)
+ranges90 <- data.frame(apply(all.mean90, MARGIN = 1, FUN = range))
+subtracts90 <- ranges90 - as.list(ranges90[1,])
+nintyperc90 <- data.frame(mapply(`*`,subtracts90,.9,SIMPLIFY=FALSE))
+diffs90 <- data.frame(mapply(`/`,nintyperc90,2,SIMPLIFY = FALSE))
+diffs90 = diffs90[-1,]
+vector90 <-  as.numeric(diffs90[1,])
+
 plot(fore90.1.u)
+lines(seq(126,215,1), (fore90.1.u$mean + vector90), type = "l", col = "red")
+lines(seq(126,215,1), (fore90.1.u$mean - vector90), type = "l", col = "red")
 ```
 
   b. Full data set. We see a clear downward trend and that the COVID hospitalized cases will eventually reach zero. The possibilities all stay closely to the mean and there doesn't seem to be much of a chance of a deviation from this model.
@@ -505,10 +533,10 @@ When investigating these models, it became clear that the 90-day forecasts were 
 ## Univariate Model Performance Breakdown
 ### ARIMA(5,1,1), s=7 Forecasting
 - 7-Day Windowed ASE
-  - 14,880,281
+    - 14,880,281
 
 - 90-Day Windowed ASE
-  - 18,103,000,000
+    - 18,103,000,000
 
 ### ARIMA(2,1,0), s=7 Forecasting
 - 7-Day Windowed ASE
@@ -519,10 +547,10 @@ When investigating these models, it became clear that the 90-day forecasts were 
 
 ### Default Neural Network Model
 - 7-Day ASE
-  - 1,511,391
+    - 1,511,391
 - 90-Day ASE
-  - 844,457,147
+    - 844,457,147
 
 ### Ensemble Model: Hyper Tuned Neural Network Model
 - 7-Day Windowed ASE
-  - 12,177,586
+    - 12,177,586
