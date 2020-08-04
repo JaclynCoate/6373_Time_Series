@@ -24,7 +24,7 @@ We leveraged the [The Covid Tracking Project](https://covidtracking.com/) for an
 
 Using the simple read.csv command we load the data from our [Data](https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject/Data) folder for our [Term Project](https://github.com/JaclynCoate/6373_Time_Series/tree/master/TermProject) Github repository.
 
-```{r load data eda}
+```{r load data usa eda}
 us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily7.19.csv", header = T, strip.white = T)
 str(us)
 ```
@@ -241,7 +241,7 @@ ggpairs(scatter)
 ### Data Prep
 In order to prep our data from our EDA we will load, transform the date, remove all zero row from the variable we are testing *hospitalizedCurrently*, and sort from oldest to newet. This will allow us to easily work through our univariate time series evaluations.
 
-```{r load data goal 2}
+```{r load data us gaol 2}
 us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
 us <- transform(us, date = as.Date(as.character(date), "%Y%m%d"))
 us <- subset(us, select = -c(states, dateChecked, hospitalized, lastModified, total, posNeg, totalTestResultsIncrease, hash))
@@ -618,6 +618,7 @@ library(tswgewrapped)
 1. Train / Test Data Sets
 
 ```{r}
+set.seed(3)
 data_train.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:122], positiveIncrease = rnorm(122, 0, .0001))
 data_test.u <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[123:132], positiveIncrease = rnorm(10, 0, .0001))
 ```
@@ -644,14 +645,13 @@ res.u
 model.u$plot_hyperparam_results()
 ```
 
-4. Best Parameters shown in below table. The best hyperparameters based on this grid search are 16 repetitions and 1 hidden layer, and allow.det.season = FALSE.
+4. Best Parameters shown in below table. The best hyperparameters based on this grid search are listed below
 
 ```{r}
 best.u <- model.u$summarize_best_hyperparams()
-best.u
 ```
 
-5. Windowed ASE of 12,177,586.
+5. Windowed ASE is below.
 
 ```{r}
 final.ase.u <- dplyr::filter(res.u, reps == best.u$reps &
@@ -679,7 +679,7 @@ plot(caret_model.u$finalModel)
 
 ```{r}
 #Ensemble model trained data
-ensemble.mlp.u1 = nnfor::mlp(usTrain.nn, outplot = T, reps = 16, hd = 1, allow.det.season = F)
+ensemble.mlp.u1 = nnfor::mlp(usTrain.nn, outplot = T, reps = best.u$reps, hd = best.u$hd, allow.det.season = F)
 ensemble.mlp.u1
 ```
 
@@ -687,7 +687,7 @@ ensemble.mlp.u1
 
 ```{r}
 #Ensemble model
-ensemble.mlp.u2 = nnfor::mlp(ts(us$hospitalizedCurrently), outplot = T, reps = 16, hd = 1, allow.det.season = F)
+ensemble.mlp.u2 = nnfor::mlp(ts(us$hospitalizedCurrently), outplot = T, reps = best.u$reps, hd = best.u$hd, allow.det.season = F)
 ensemble.mlp.u2
 ```
 
@@ -696,7 +696,21 @@ ensemble.mlp.u2
 
 ```{r}
 fore7.1.u = forecast(ensemble.mlp.u1 , h=7)
+```
+
+```{r}
+#grabbing prediction intervals for 7 day forecast
+all.mean7 <- data.frame(fore7.1.u$all.mean)
+ranges7 <- data.frame(apply(all.mean7, MARGIN = 1, FUN = range))
+subtracts7 <- ranges7 - as.list(ranges7[1,])
+nintyperc7 <- data.frame(mapply(`*`,subtracts7,.9,SIMPLIFY=FALSE))
+diffs7 <- data.frame(mapply(`/`,nintyperc7,2,SIMPLIFY = FALSE))
+diffs7 = diffs7[-1,]
+vector7 <-  as.numeric(diffs7[1,])
+
 plot(fore7.1.u)
+lines(seq(126,132,1), (fore7.1.u$mean + vector7), type = "l", col = "red")
+lines(seq(126,132,1), (fore7.1.u$mean - vector7), type = "l", col = "red")
 ```
 
   b. Next we forecasted the 7-day for our full data set. We see a much strong downward trend in our 7 day forecast.
@@ -711,7 +725,21 @@ plot(fore7.2.u)
 
 ```{r}
 fore90.1.u = forecast(ensemble.mlp.u1, h=90)
+```
+
+```{r}
+#grabbing prediction intervals for 90 day forecast
+all.mean90 <- data.frame(fore90.1.u$all.mean)
+ranges90 <- data.frame(apply(all.mean90, MARGIN = 1, FUN = range))
+subtracts90 <- ranges90 - as.list(ranges90[1,])
+nintyperc90 <- data.frame(mapply(`*`,subtracts90,.9,SIMPLIFY=FALSE))
+diffs90 <- data.frame(mapply(`/`,nintyperc90,2,SIMPLIFY = FALSE))
+diffs90 = diffs90[-1,]
+vector90 <-  as.numeric(diffs90[1,])
+
 plot(fore90.1.u)
+lines(seq(126,215,1), (fore90.1.u$mean + vector90), type = "l", col = "red")
+lines(seq(126,215,1), (fore90.1.u$mean - vector90), type = "l", col = "red")
 ```
 
   b. Full data set. We see a clear downward trend and that the COVID hospitalized cases will eventually reach zero. The possibilities all stay closely to the mean and there doesn't seem to be much of a chance of a deviation from this model.
@@ -729,10 +757,10 @@ When investigating these models, it became clear that the 90-day forecasts were 
 ## Univariate Model Performance Breakdown
 ### ARIMA(5,1,1), s=7 Forecasting
 - 7-Day Windowed ASE
-  - 14,880,281
+    - 14,880,281
 
 - 90-Day Windowed ASE
-  - 18,103,000,000
+    - 18,103,000,000
 
 ### ARIMA(2,1,0), s=7 Forecasting
 - 7-Day Windowed ASE
@@ -743,20 +771,21 @@ When investigating these models, it became clear that the 90-day forecasts were 
 
 ### Default Neural Network Model
 - 7-Day ASE
-  - 1,511,391
+    - 1,511,391
 - 90-Day ASE
-  - 844,457,147
+    - 844,457,147
 
 ### Ensemble Model: Hyper Tuned Neural Network Model
 - 7-Day Windowed ASE
-  - 12,177,586
+    - 12,177,586
+
 
 ## Goal 3: US COVID Data
 
 ### Data Prep
 In order to prep our data from our EDA we will load, transform the date, remove all zero row from the variable we are testing *hospitalizedCurrently*, and sort from oldest to newest. This will allow us to easily work through our multivariate time series evaluations.
 
-```{r load data goal 3}
+```{r load data us goal 3}
 us <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/USdaily.7.26.20.csv", header = T, strip.white = T)
 us <- transform(us, date = as.Date(as.character(date), "%Y%m%d"))
 us <- subset(us, select = -c(states, dateChecked, hospitalized, lastModified, total, posNeg, totalTestResultsIncrease, hash))
@@ -1366,6 +1395,7 @@ library(tswgewrapped)
 1. Train/ Test Data Sets
 
 ```{r}
+set.seed(3)
 data_train.m <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[1:122], positiveIncrease = us$positiveIncrease[1:122])
 data_test.m <- data.frame(hospitalizedCurrently = us$hospitalizedCurrently[123:132], positiveIncrease = us$positiveIncrease[123:132])
 ```
@@ -1438,14 +1468,42 @@ plot(ensemble.mlp)
 
 ```{r}
 fore7.m = forecast(ensemble.mlp, xreg = new.regressor7, h=7)
+```
+
+```{r}
+#grabbing prediction intervals for 7 day forecast
+all.mean.m7 <- data.frame(fore7.m$all.mean)
+ranges.m7 <- data.frame(apply(all.mean.m7, MARGIN = 1, FUN = range))
+subtracts.m7 <- ranges.m7 - as.list(ranges.m7[1,])
+nintyperc.m7 <- data.frame(mapply(`*`,subtracts.m7,.9,SIMPLIFY=FALSE))
+diffs.m7 <- data.frame(mapply(`/`,nintyperc.m7,2,SIMPLIFY = FALSE))
+diffs.m7 = diffs.m7[-1,]
+vector.m7 <-  as.numeric(diffs.m7[1,])
+
 plot(fore7.m)
+lines(seq(133,139,1), (fore7.m$mean + vector.m7), type = "l", col = "red")
+lines(seq(133,139,1), (fore7.m$mean - vector.m7), type = "l", col = "red")
 ```
 
   - 90 Day
   
 ```{r}
 fore90.m = forecast(ensemble.mlp, xreg = new.regressor90, h=90)
+```
+
+```{r}
+#grabbing prediction intervals for 90 day forecast
+all.mean.m90 <- data.frame(fore90.m$all.mean)
+ranges.m90 <- data.frame(apply(all.mean.m90, MARGIN = 1, FUN = range))
+subtracts.m90 <- ranges.m90 - as.list(ranges.m90[1,])
+nintyperc.m90 <- data.frame(mapply(`*`,subtracts.m90,.9,SIMPLIFY=FALSE))
+diffs.m90 <- data.frame(mapply(`/`,nintyperc.m90,2,SIMPLIFY = FALSE))
+diffs.m90 = diffs.m90[-1,]
+vector.m90 <-  as.numeric(diffs.m90[1,])
+
 plot(fore90.m)
+lines(seq(133,222,1), (fore90.m$mean + vector.m90), type = "l", col = "red")
+lines(seq(133,222,1), (fore90.m$mean - vector.m90), type = "l", col = "red")
 ```
 
 7. ASE
@@ -1474,7 +1532,7 @@ Upon reviewing our 90-day forecasts and ASEs we have concluded it would not be a
 
 We have chosen two models to help us predict severity with the COVID hospitalized. We will leverage the vector AR model for short term forecasts This model allows us to base our predictions off of previously observed values. Since COVID has not completed a full cycle and has shown heavy wandering behavior in the realization, we feel using this method will be the closest in order to get us prepared for forecasts for our 7-day and doing short term planning for the hospitalizes supplies and staffing with prediction intervals to help us make sure we account for possible peaks and valleys in our forecast.
 
-For our long term forecasting we have chosen to go with our hyper tuned parameter neural network model. This model is helpful for long term forecasting because it has the ability to adjust and reapply the most effective model based on the newest data input with daily updates. Since the multilayered perceptron neural network models are not based on a fixed distribution assumption, this model will not come with prediction intervals. But rather, will continue to calculate all of the probably outcomes and produce a mean forecast for us to base all planning. The hyper parameter turned neural network model takes into account multiple possibilities and therefore does give us the most statistically useful forecast for our 90-day period. 
+For our long term forecasting we have chosen to go with our hyper tuned parameter neural network model. This model is helpful for long term forecasting because it has the ability to adjust and reapply the most effective model based on the newest data input with daily updates. We've calculated 90% confidence intervals based on the range of the forecasted possibilities. We will continue to calculate all of the probably outcomes and produce a mean forecast for us to base all planning. The hyper parameter turned neural network model takes into account multiple possibilities and therefore does give us the most statistically useful forecast for our 90-day period. 
 
 It is essential both of these models be updated daily. COVID cases and hospitalizations changes frequently and the only way to continue to forecast and prepare as effectively as possible is to have updated models with as much historical data being taken into account as possible. As we move forward with presenting these models we've deicded on, it is important to remember these just appear to be the most useful models, and while we can work from them, none of them will be correct.
 
@@ -1488,52 +1546,54 @@ lines(seq(133,139,1), as.data.frame(currHospForecasts7)$lower, type = "l", col =
 
 ```{r}
 #Hyper Tuned Parameter Neural Network Model Forecast w/ Prediction Intervals
-fore90.m = forecast(ensemble.mlp, xreg = new.regressor90, h=90, )
 plot(fore90.m)
+lines(seq(133,222,1), (fore90.m$mean + vector.m90), type = "l", col = "red")
+lines(seq(133,222,1), (fore90.m$mean - vector.m90), type = "l", col = "red")
 ```
 
 ### Multivariate Model Performance Breakdown
 #### Multiple Regression w/ Correlated Errors w/o Trend
 - AIC: 2184.712
 - 7-Day ASE
-  - 631,469.8
+    - 631,469.8
 
 - 90-Day ASE
-  - 567,209,810
+    - 567,209,810
 
 #### Multiple Regression w/ Correlated Errors w/ Trend
-AIC: 2186.678
+- AIC: 2186.678
 - 7-Day ASE
-  - 1,449,565
-
+    - 1,449,565
 - 90-Day ASE
-   - 2,867,623,021
+    - 2,867,623,021
 
 #### Vector AR Model 
 - 7-Day ASE
-  - 25,178.55
+    - 25,178.55
 - 90-Day ASE
-  - 10,791.59
+    - 10,791.59
 
 #### Multilayered Perceptron / Neural Network Model
 - 7-Day ASE
-  - 4,068,222
+    - 4,068,222
 - 90-Day ASE
-  - 17,516,230,847
+    - 17,516,230,847
 
 #### Ensemble Model: Hyper Tuned Neural Network Model
 - 7-Day ASE
-  - 2,126,994
+    - 2,126,994
 - 90-Day ASE
-  - 2,239,014,808
+    - 2,239,014,808
 - 7-Day Windowed ASE
-  - 13,970,241
+    - 13,970,241
+
+
 
 # California COVID Data
 
 ## EDA: California
 
-```{r load data, message=FALSE}
+```{r cali eda load data, message=FALSE}
 CA <- read.csv("https://raw.githubusercontent.com/JaclynCoate/6373_Time_Series/master/TermProject/Data/CA_COVID_7.16.20.csv", header = T)
 #Re-format Date
 CA$date <- as.Date(CA$date, format = "%m/%d/%Y")
