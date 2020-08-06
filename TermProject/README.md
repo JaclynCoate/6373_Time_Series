@@ -8,10 +8,10 @@ The purpose of this repository is to share our collaborative work in order to co
 
 ## Github Case Study Structure
 * [Final Deck] - final presenations and completed codebook w/ knitted HTML document
-* [Working Code] - contains individual code books for different required sections of the project
+* [Working Code] - preliminary individual code books for different required sections of the project
 * [Requirements] - term project documentation and rubric
 * [Data] - chosen data sources
-* [Recordings] - presentation video portions
+* [Recordings] - preliminary presentation video portions
 
 ## Contributors
 Please contact any of the members below: 
