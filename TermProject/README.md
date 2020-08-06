@@ -1,5 +1,7 @@
 # MSDS 6373 Time Series: Term Project
 
+Final Video Presentation: https://youtu.be/SvNlbkFX3aU
+
 ## Introduction
 The purpose of this repository is to share our collaborative work in order to complete our MSDS 6373 Time Series term project. We researched and selected data sets in order to do an evaluation on the COVID pandemic on both the US and California. We created predictive models using teqchniques such as univariate and mulitvariate analysis.
 
