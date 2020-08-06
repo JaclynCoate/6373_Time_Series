@@ -1,6 +1,6 @@
 # MSDS 6373 Time Series: Term Project
 
-- EDA Video Presentation: https://www.youtube.com/3s6IMlo7Sw0
+- EDA Video Presentation: https://youtu.be/3s6IMlo7Sw0
 - Final Video Presentation: https://youtu.be/SvNlbkFX3aU
 
 ## Introduction
